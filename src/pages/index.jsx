@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../components/ui/button.jsx';
 import { Card, CardContent, CardTitle, CardDescription } from '../components/ui/card.jsx';
 import { Input } from '../components/ui/input.jsx';
+import {
+  initializeTracking,
+  trackTabSwitch,
+  trackCalculatorUsage,
+  trackContactFormInteraction,
+  submitContactForm,
+  trackInteraction
+} from '../utils/analytics';
 
 // Service Icons
 const ServiceIcons = {
@@ -67,6 +75,18 @@ export default function HomePage() {
   const [height, setHeight] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
 
+  // Initialize tracking when component mounts
+  useEffect(() => {
+    initializeTracking();
+  }, []);
+
+  // Helper function to handle tab switching with tracking
+  const handleTabSwitch = (newTab) => {
+    const oldTab = activeTab;
+    setActiveTab(newTab);
+    trackTabSwitch(oldTab, newTab);
+  };
+
   // Calculator options
   const [grillType, setGrillType] = useState('window');
   const [metalType, setMetalType] = useState('steel');
@@ -111,7 +131,7 @@ export default function HomePage() {
         setTimeout(() => setQuoteNotification(null), 3000);
       }
     }
-    setActiveTab('calculator');
+    handleTabSwitch('calculator');
   };
 
   // Contact form state
@@ -326,6 +346,33 @@ export default function HomePage() {
 
   const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters } = calculateResults();
 
+  // Track calculator usage when values change
+  useEffect(() => {
+    if (width > 0 && height > 0 && weight > 0) {
+      trackCalculatorUsage({
+        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard',
+        grillType,
+        metalType,
+        profileType,
+        dimensions: {
+          width,
+          height,
+          widthUnit: widthUnit,
+          heightUnit: heightUnit
+        },
+        estimatedWeight: weight,
+        estimatedCost: cost
+      });
+    }
+  }, [width, height, grillType, metalType, profileType, weight, cost, showAdvancedCalculator, widthUnit, heightUnit]);
+
+  // Track contact form view when contact tab is active
+  useEffect(() => {
+    if (activeTab === 'contact') {
+      trackContactFormInteraction('form_view');
+    }
+  }, [activeTab]);
+
   // Handle contact form input changes
   const handleContactInputChange = (e) => {
     const { name, value } = e.target;
@@ -342,11 +389,30 @@ export default function HomePage() {
     setSubmitStatus(null);
 
     try {
-      // Simulate form submission (replace with actual API call)
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Track form submission attempt
+      await trackContactFormInteraction('form_submit', contactForm);
 
-      // For now, we'll just log the form data and show success
-      console.log('Contact Form Submitted:', contactForm);
+      // Prepare calculator data if available
+      const calculatorData = (width > 0 && height > 0) ? {
+        dimensions: {
+          width,
+          height,
+          widthUnit,
+          heightUnit
+        },
+        grillType,
+        metalType,
+        profileType,
+        estimatedWeight: weight,
+        estimatedCost: cost,
+        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard'
+      } : null;
+
+      // Submit to backend
+      await submitContactForm({
+        ...contactForm,
+        calculatorData
+      });
 
       setSubmitStatus('success');
 
@@ -387,7 +453,7 @@ export default function HomePage() {
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
+                  onClick={() => handleTabSwitch(tab.id)}
                   className={`
                     flex items-center gap-1 xs:gap-2 sm:gap-3 lg:gap-4 px-2 xs:px-3 sm:px-6 lg:px-8 xl:px-10 py-2 xs:py-2.5 sm:py-3 lg:py-4 rounded-xl font-medium transition-all duration-300 whitespace-nowrap flex-shrink-0 lg:flex-1 lg:justify-center
                     ${activeTab === tab.id
@@ -474,7 +540,7 @@ export default function HomePage() {
                         <Button
                           size="lg"
                           className="shadow-glow hover:shadow-glow-lg w-full sm:w-auto"
-                          onClick={() => setActiveTab('calculator')}
+                          onClick={() => handleTabSwitch('calculator')}
                           icon={
                             <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -1103,7 +1169,7 @@ export default function HomePage() {
                               )}
                             </div>
                             <Button
-                              onClick={() => setActiveTab('contact')}
+                              onClick={() => handleTabSwitch('contact')}
                               className="w-full sm:w-auto"
                             >
                               Get Detailed Quote
@@ -1498,6 +1564,15 @@ export default function HomePage() {
               <p className="text-steel-500 text-xs mt-1">
                 eMetalWorks is a service by Bhavya Fabrication Works, Hyderabad
               </p>
+              <div className="mt-2">
+                <a
+                  href="/admin"
+                  className="text-steel-600 hover:text-steel-400 text-xs transition-colors"
+                  title="Admin Dashboard"
+                >
+                  Admin
+                </a>
+              </div>
             </div>
           </div>
         </div>
