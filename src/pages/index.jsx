@@ -126,6 +126,41 @@ export default function HomePage() {
   const [metalType, setMetalType] = useState('steel');
   const [profileType, setProfileType] = useState('square'); // square, round, angle
 
+  // Unit conversion options (must be declared before useEffect)
+  const [widthUnit, setWidthUnit] = useState('cm');
+  const [heightUnit, setHeightUnit] = useState('cm');
+
+  // Rod count state for window grills
+  const [verticalRods, setVerticalRods] = useState(3);
+  const [horizontalRods, setHorizontalRods] = useState(5);
+  const [useRodCalculation, setUseRodCalculation] = useState(false);
+
+  // Function to suggest default rod counts based on window size
+  const getDefaultRodCounts = (widthFt, heightFt) => {
+    // Standard spacing: 12-16 inches for vertical, 10-15 inches for horizontal
+    const verticalSpacing = 15; // inches
+    const horizontalSpacing = 12; // inches
+
+    const suggestedVertical = Math.max(2, Math.ceil((widthFt * 12) / verticalSpacing));
+    const suggestedHorizontal = Math.max(3, Math.ceil((heightFt * 12) / horizontalSpacing));
+
+    return {
+      vertical: Math.min(suggestedVertical, 6), // Cap at 6 for practical reasons
+      horizontal: Math.min(suggestedHorizontal, 8) // Cap at 8 for practical reasons
+    };
+  };
+
+  // Update rod counts when dimensions change
+  useEffect(() => {
+    if (useRodCalculation && width && height) {
+      const widthInFt = convertToFeet(width, widthUnit);
+      const heightInFt = convertToFeet(height, heightUnit);
+      const defaults = getDefaultRodCounts(widthInFt, heightInFt);
+      setVerticalRods(defaults.vertical);
+      setHorizontalRods(defaults.horizontal);
+    }
+  }, [width, height, widthUnit, heightUnit, useRodCalculation]);
+
   // Advanced calculator state
   const [showAdvancedCalculator, setShowAdvancedCalculator] = useState(false);
   const [customLinearFactor, setCustomLinearFactor] = useState('');
@@ -140,9 +175,7 @@ export default function HomePage() {
   const [laborRate, setLaborRate] = useState('80'); // ₹ per sq.ft
   const [customDesignFactor, setCustomDesignFactor] = useState(''); // ₹ per foot for fancy work
 
-  // Unit conversion options
-  const [widthUnit, setWidthUnit] = useState('cm');
-  const [heightUnit, setHeightUnit] = useState('cm');
+
 
   // Function to navigate to calculator with pre-selected grill type
   const goToCalculator = (serviceType = null) => {
@@ -227,7 +260,7 @@ export default function HomePage() {
   };
 
   // Weight per meter for different profile types and metals (kg/m)
-  // Based on standard sizes: Square 20x20x2mm, Round 20mm dia x 2mm wall, Angle 25x25x3mm
+  // Based on standard sizes and rod thickness options
   const weightPerMeter = {
     square: {
       steel: 1.15,        // 20x20x2mm square pipe in mild steel
@@ -246,6 +279,25 @@ export default function HomePage() {
       stainless: 1.78,    // 25x25x3mm angle iron in stainless steel
       aluminum: 0.62,     // 25x25x3mm angle iron in aluminum
       iron: 1.67          // 25x25x3mm angle iron in cast iron
+    },
+    // Rod thickness options for window grills (using round bar formula: d² × 0.006165 kg/m)
+    rod_8mm: {
+      steel: 0.39,        // 8mm dia round rod - (8² × 0.006165) = 0.39 kg/m
+      stainless: 0.39,    // 8mm dia round rod in stainless steel
+      aluminum: 0.14,     // 8mm dia round rod in aluminum (density factor ~0.35)
+      iron: 0.37          // 8mm dia round rod in cast iron
+    },
+    rod_10mm: {
+      steel: 0.62,        // 10mm dia round rod - (10² × 0.006165) = 0.62 kg/m
+      stainless: 0.62,    // 10mm dia round rod in stainless steel
+      aluminum: 0.22,     // 10mm dia round rod in aluminum
+      iron: 0.58          // 10mm dia round rod in cast iron
+    },
+    rod_12mm: {
+      steel: 0.89,        // 12mm dia round rod - (12² × 0.006165) = 0.89 kg/m
+      stainless: 0.89,    // 12mm dia round rod in stainless steel
+      aluminum: 0.31,     // 12mm dia round rod in aluminum
+      iron: 0.84          // 12mm dia round rod in cast iron
     }
   };
 
@@ -257,6 +309,17 @@ export default function HomePage() {
       'inch': 2.54,      // Inches to cm
       'ft': 30.48,       // Feet to cm
       'm': 100           // Meters to cm
+    };
+    return value * conversions[unit];
+  };
+
+  const convertToFeet = (value, unit) => {
+    const conversions = {
+      'cm': 0.0328084,   // Centimeters to feet
+      'mm': 0.00328084,  // Millimeters to feet
+      'inch': 0.0833333, // Inches to feet
+      'ft': 1,           // Feet (base unit)
+      'm': 3.28084       // Meters to feet
     };
     return value * conversions[unit];
   };
@@ -287,6 +350,56 @@ export default function HomePage() {
         linearFactor: 0,
         profileWeight: 0,
         grillAreaSqMeters: 0
+      };
+    }
+
+    // Rod-based calculation for window grills
+    if (useRodCalculation && grillType === 'window') {
+      const widthInFt = convertToFeet(width, widthUnit);
+      const heightInFt = convertToFeet(height, heightUnit);
+
+      // Calculate total rod length
+      const verticalRodLength = verticalRods * heightInFt; // feet
+      const horizontalRodLength = horizontalRods * widthInFt; // feet
+      const totalRodLengthFt = verticalRodLength + horizontalRodLength;
+      const totalRodLengthMm = totalRodLengthFt * 304.8; // Convert to mm
+
+      // Get rod diameter from profile type
+      let rodDiameter = 10; // default 10mm
+      if (profileType.includes('8mm')) rodDiameter = 8;
+      else if (profileType.includes('10mm')) rodDiameter = 10;
+      else if (profileType.includes('12mm')) rodDiameter = 12;
+
+      // Calculate weight using rod formula: Weight (kg) = (d² × L × 0.006165) / 1000
+      const rodWeight = (Math.pow(rodDiameter, 2) * totalRodLengthMm * 0.006165) / 1000;
+
+      // Apply material density factor
+      const materialFactor = metalType === 'aluminum' ? 0.35 :
+                           metalType === 'iron' ? 0.95 : 1.0;
+      const weight = rodWeight * materialFactor;
+      const cost = weight * getMetalRate();
+
+      return {
+        weight,
+        cost,
+        materialCost: cost,
+        laborCost: 0,
+        designCost: 0,
+        totalBarLength: totalRodLengthFt,
+        numberOfBars: verticalRods + horizontalRods,
+        wastageWeight: 0,
+        totalLinearMeters: totalRodLengthFt * 0.3048,
+        linearFactor: 0,
+        profileWeight: rodWeight / (totalRodLengthFt * 0.3048),
+        grillAreaSqMeters: (widthInFt * heightInFt) * 0.092903,
+        rodDetails: {
+          verticalRods,
+          horizontalRods,
+          rodDiameter,
+          verticalRodLength,
+          horizontalRodLength,
+          totalRodLengthFt
+        }
       };
     } else if (showAdvancedCalculator) {
       // PRACTICAL FABRICATION FORMULA
@@ -440,7 +553,18 @@ export default function HomePage() {
         profileType,
         estimatedWeight: weight,
         estimatedCost: cost,
-        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard',
+        calculatorType: useRodCalculation ? 'rod_based' : (showAdvancedCalculator ? 'advanced' : 'standard'),
+        // Add rod calculation data if available
+        ...(useRodCalculation && grillType === 'window' && {
+          rodCalculation: {
+            verticalRods,
+            horizontalRods,
+            rodDiameter: profileType.includes('8mm') ? 8 : profileType.includes('10mm') ? 10 : profileType.includes('12mm') ? 12 : 10,
+            totalRodLength: ((verticalRods * convertToFeet(height, heightUnit)) + (horizontalRods * convertToFeet(width, widthUnit))).toFixed(1),
+            verticalRodLength: (verticalRods * convertToFeet(height, heightUnit)).toFixed(1),
+            horizontalRodLength: (horizontalRods * convertToFeet(width, widthUnit)).toFixed(1)
+          }
+        }),
         // Add advanced calculator data if available
         ...(showAdvancedCalculator && {
           designType,
@@ -916,15 +1040,135 @@ export default function HomePage() {
                           onChange={(e) => setProfileType(e.target.value)}
                           className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white"
                         >
-                          <option value="square">Square Pipe (20×20×2mm) - {weightPerMeter.square?.[metalType] || 1.15} kg/m</option>
-                          <option value="round">Round Pipe (20mm dia×2mm wall) - {weightPerMeter.round?.[metalType] || 0.89} kg/m</option>
-                          <option value="angle">Angle Iron (25×25×3mm) - {weightPerMeter.angle?.[metalType] || 1.78} kg/m</option>
+                          <optgroup label="Standard Profiles">
+                            <option value="square">Square Pipe (20×20×2mm) - {weightPerMeter.square?.[metalType] || 1.15} kg/m</option>
+                            <option value="round">Round Pipe (20mm dia×2mm wall) - {weightPerMeter.round?.[metalType] || 0.89} kg/m</option>
+                            <option value="angle">Angle Iron (25×25×3mm) - {weightPerMeter.angle?.[metalType] || 1.78} kg/m</option>
+                          </optgroup>
+                          <optgroup label="Rod Thickness (for Window Grills)">
+                            <option value="rod_8mm">8mm Round Rod - {weightPerMeter.rod_8mm?.[metalType] || 0.39} kg/m</option>
+                            <option value="rod_10mm">10mm Round Rod - {weightPerMeter.rod_10mm?.[metalType] || 0.62} kg/m</option>
+                            <option value="rod_12mm">12mm Round Rod - {weightPerMeter.rod_12mm?.[metalType] || 0.89} kg/m</option>
+                          </optgroup>
                         </select>
                         <p className="text-xs text-steel-500 mt-1">
-                          Standard profile sizes with weight per meter for {metalType === 'steel' ? 'mild steel' : metalType === 'stainless' ? 'stainless steel' : metalType === 'aluminum' ? 'aluminum' : 'cast iron'}
+                          Choose profile type: Standard pipes/angles for structural work, or rod thickness (8mm/10mm/12mm) for window grills. Weights shown for {metalType === 'steel' ? 'mild steel' : metalType === 'stainless' ? 'stainless steel' : metalType === 'aluminum' ? 'aluminum' : 'cast iron'}.
                         </p>
                       </div>
                     </div>
+
+                    {/* Rod Count Calculator for Window Grills */}
+                    {grillType === 'window' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-green-50 rounded-xl p-4 sm:p-6 mb-6 border border-green-200"
+                      >
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-lg font-semibold text-green-900 flex items-center gap-2">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                            </svg>
+                            Rod-Based Calculation
+                          </h4>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={useRodCalculation}
+                              onChange={(e) => setUseRodCalculation(e.target.checked)}
+                              className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
+                            />
+                            <span className="text-sm text-green-700">Use Rod Count Method</span>
+                          </label>
+                        </div>
+
+                        {useRodCalculation && (
+                          <div className="space-y-4">
+                            <p className="text-sm text-green-700 mb-4">
+                              Calculate based on actual number of rods needed for your window grill. Default values are suggested based on standard spacing.
+                            </p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-2">
+                                  Vertical Rods
+                                </label>
+                                <input
+                                  type="number"
+                                  min="2"
+                                  max="10"
+                                  value={verticalRods}
+                                  onChange={(e) => setVerticalRods(parseInt(e.target.value) || 2)}
+                                  className="w-full px-4 py-3 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white"
+                                  placeholder="Number of vertical rods"
+                                />
+                                <p className="text-xs text-green-600 mt-1">
+                                  Suggested: {width && height ? getDefaultRodCounts(convertToFeet(width, widthUnit), convertToFeet(height, heightUnit)).vertical : 3} rods (12-16" spacing)
+                                </p>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-green-700 mb-2">
+                                  Horizontal Rods
+                                </label>
+                                <input
+                                  type="number"
+                                  min="3"
+                                  max="12"
+                                  value={horizontalRods}
+                                  onChange={(e) => setHorizontalRods(parseInt(e.target.value) || 3)}
+                                  className="w-full px-4 py-3 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white"
+                                  placeholder="Number of horizontal rods"
+                                />
+                                <p className="text-xs text-green-600 mt-1">
+                                  Suggested: {width && height ? getDefaultRodCounts(convertToFeet(width, widthUnit), convertToFeet(height, heightUnit)).horizontal : 5} rods (10-15" spacing)
+                                </p>
+                              </div>
+                            </div>
+
+                            {width && height && (
+                              <div className="bg-white rounded-lg p-3 border border-green-200">
+                                <p className="text-sm text-green-800">
+                                  <strong>Rod Configuration:</strong> {verticalRods} vertical × {convertToFeet(height, heightUnit).toFixed(1)}ft + {horizontalRods} horizontal × {convertToFeet(width, widthUnit).toFixed(1)}ft = {((verticalRods * convertToFeet(height, heightUnit)) + (horizontalRods * convertToFeet(width, widthUnit))).toFixed(1)} total feet
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Standard Rod Configuration Reference */}
+                            <div className="bg-white rounded-lg p-3 border border-green-200">
+                              <h5 className="text-sm font-semibold text-green-800 mb-2">📏 Standard Rod Configurations:</h5>
+                              <div className="text-xs text-green-700 space-y-1">
+                                <div className="grid grid-cols-3 gap-2 font-medium border-b border-green-200 pb-1">
+                                  <span>Window Size</span>
+                                  <span>Vertical Rods</span>
+                                  <span>Horizontal Rods</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <span>3×4 ft</span>
+                                  <span>2-3 rods</span>
+                                  <span>4 rods</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <span>4×5 ft</span>
+                                  <span>3-4 rods</span>
+                                  <span>5 rods</span>
+                                </div>
+                                <div className="grid grid-cols-3 gap-2">
+                                  <span>5×6 ft</span>
+                                  <span>4-5 rods</span>
+                                  <span>6 rods</span>
+                                </div>
+                              </div>
+                              <p className="text-xs text-green-600 mt-2">
+                                <strong>💡 Tip:</strong> Standard spacing is 12-16" for vertical rods and 10-15" for horizontal rods. More rods = better security, fewer rods = better view.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
 
                     {/* Advanced Calculator Options */}
                     {showAdvancedCalculator && (
@@ -1135,7 +1379,7 @@ export default function HomePage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-center">
                           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft">
                             <div className="text-2xl sm:text-3xl font-bold text-primary-600 mb-2">
-                              {(isNaN(weight) ? 0 : weight).toFixed(2)} kg
+                              {Math.round(isNaN(weight) ? 0 : weight)} kg
                             </div>
                             <div className="text-steel-600 font-medium">Estimated Weight</div>
                             <div className="text-xs text-steel-500 mt-1">
@@ -1166,7 +1410,7 @@ export default function HomePage() {
                                 <div className="font-bold text-green-600">₹{(materialCost || 0).toFixed(0)}</div>
                                 <div className="text-green-700">Material Cost</div>
                                 <div className="text-xs text-green-600 mt-1">
-                                  {(weight || 0).toFixed(1)} kg × ₹{getMetalRate().toFixed(0)}/kg
+                                  {Math.round(weight || 0)} kg × ₹{getMetalRate().toFixed(0)}/kg
                                   {wastageWeight > 0 && (
                                     <div>+ {wastagePercent}% wastage</div>
                                   )}
@@ -1176,7 +1420,7 @@ export default function HomePage() {
                                 <div className="font-bold text-blue-600">₹{(laborCost || 0).toFixed(0)}</div>
                                 <div className="text-blue-700">Labor Cost</div>
                                 <div className="text-xs text-blue-600 mt-1">
-                                  {((widthInCm * 0.0328084) * (heightInCm * 0.0328084)).toFixed(1)} sq.ft × ₹{laborRate || 80}/sq.ft
+                                  {Math.round((widthInCm * 0.0328084) * (heightInCm * 0.0328084))} sq.ft × ₹{laborRate || 80}/sq.ft
                                 </div>
                               </div>
                               <div className="bg-white rounded-lg p-3 text-center">
@@ -1198,8 +1442,13 @@ export default function HomePage() {
                               )}
                             </p>
                             <p className="text-xs text-blue-600">
-                              <strong>Calculation:</strong> {(isNaN(grillAreaSqMeters) ? 0 : grillAreaSqMeters).toFixed(2)} m² × {linearFactor} m/m² × {profileWeight.toFixed(2)} kg/m = {(isNaN(weight) ? 0 : weight).toFixed(1)} kg
+                              <strong>Calculation:</strong> {Math.round(isNaN(grillAreaSqMeters) ? 0 : grillAreaSqMeters)} m² × {Math.round(linearFactor)} m/m² × {Math.round(profileWeight)} kg/m = {Math.round(isNaN(weight) ? 0 : weight)} kg
                             </p>
+                            {(profileType?.includes('rod_') || profileType?.includes('mm')) && (
+                              <p className="text-xs text-green-600 mt-1">
+                                <strong>📏 Rod Weight Formula:</strong> For round rods, weight = d² × 0.006165 kg/m (where d = diameter in mm)
+                              </p>
+                            )}
                           </div>
                           <p className="text-sm text-steel-500 mb-4">
                             *This is a rough estimate. Final pricing may vary based on design complexity, finishing, and installation requirements.
@@ -1519,8 +1768,16 @@ export default function HomePage() {
                                       <div><span className="font-medium">Grill Type:</span> {grillType}</div>
                                       <div><span className="font-medium">Metal Type:</span> {metalType}</div>
                                       <div><span className="font-medium">Profile:</span> {profileType}</div>
-                                      <div><span className="font-medium">Est. Weight:</span> {weight.toFixed(2)} kg</div>
-                                      <div><span className="font-medium">Est. Cost:</span> ₹{cost.toFixed(2)}</div>
+                                      <div><span className="font-medium">Est. Weight:</span> {Math.round(weight)} kg</div>
+                                      <div><span className="font-medium">Est. Cost:</span> ₹{Math.round(cost)}</div>
+                                      {useRodCalculation && grillType === 'window' && (
+                                        <>
+                                          <div><span className="font-medium">Vertical Rods:</span> {verticalRods}</div>
+                                          <div><span className="font-medium">Horizontal Rods:</span> {horizontalRods}</div>
+                                          <div><span className="font-medium">Rod Diameter:</span> {profileType.includes('8mm') ? '8mm' : profileType.includes('10mm') ? '10mm' : profileType.includes('12mm') ? '12mm' : '10mm'}</div>
+                                          <div><span className="font-medium">Total Rod Length:</span> {((verticalRods * convertToFeet(height, heightUnit)) + (horizontalRods * convertToFeet(width, widthUnit))).toFixed(1)}ft</div>
+                                        </>
+                                      )}
                                       {showAdvancedCalculator && (
                                         <>
                                           <div><span className="font-medium">Design:</span> {designType}</div>

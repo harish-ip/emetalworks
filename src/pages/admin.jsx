@@ -611,13 +611,13 @@ export default function AdminDashboard() {
                                 {contact.calculatorData.estimatedWeight && (
                                   <div>
                                     <span className="font-medium">Weight: </span>
-                                    {contact.calculatorData.estimatedWeight} kg
+                                    {Math.round(contact.calculatorData.estimatedWeight)} kg
                                   </div>
                                 )}
                                 {contact.calculatorData.estimatedCost && (
                                   <div>
                                     <span className="font-medium">Cost: </span>
-                                    ₹{contact.calculatorData.estimatedCost}
+                                    ₹{Math.round(contact.calculatorData.estimatedCost)}
                                   </div>
                                 )}
                                 {contact.calculatorData.calculatorType && (
@@ -627,6 +627,39 @@ export default function AdminDashboard() {
                                   </div>
                                 )}
                               </div>
+
+                              {/* Rod Calculation Details */}
+                              {contact.calculatorData.rodCalculation && (
+                                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                                  <h5 className="text-sm font-medium text-green-800 mb-2">Rod Configuration:</h5>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                                    <div>
+                                      <span className="font-medium text-green-700">Vertical Rods: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.verticalRods}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-green-700">Horizontal Rods: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.horizontalRods}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-green-700">Rod Diameter: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.rodDiameter}mm</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-green-700">Vertical Length: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.verticalRodLength}ft</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-green-700">Horizontal Length: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.horizontalRodLength}ft</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-medium text-green-700">Total Length: </span>
+                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.totalRodLength}ft</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
