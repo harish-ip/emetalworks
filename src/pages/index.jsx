@@ -146,6 +146,7 @@ export default function HomePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [includeCalculatorData, setIncludeCalculatorData] = useState(false);
 
   // Quote notification state
   const [quoteNotification, setQuoteNotification] = useState(null); // 'success', 'error', or null
@@ -392,8 +393,8 @@ export default function HomePage() {
       // Track form submission attempt
       await trackContactFormInteraction('form_submit', contactForm);
 
-      // Prepare calculator data if available
-      const calculatorData = (width > 0 && height > 0) ? {
+      // Prepare calculator data if available and user wants to include it
+      const calculatorData = (includeCalculatorData && width > 0 && height > 0) ? {
         dimensions: {
           width,
           height,
@@ -405,7 +406,20 @@ export default function HomePage() {
         profileType,
         estimatedWeight: weight,
         estimatedCost: cost,
-        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard'
+        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard',
+        // Add advanced calculator data if available
+        ...(showAdvancedCalculator && {
+          designType,
+          barSpacing,
+          wastagePercent,
+          laborRate,
+          customLinearFactor,
+          customProfileWeight,
+          customProfileSize,
+          materialCost: materialCost || 0,
+          laborCost: laborCost || 0,
+          totalLinearMeters: totalLinearMeters || 0
+        })
       } : null;
 
       // Submit to backend
@@ -1420,6 +1434,53 @@ export default function HomePage() {
                             required
                           ></textarea>
                         </div>
+
+                        {/* Calculator Data Inclusion */}
+                        {(width > 0 && height > 0) && (
+                          <div className="border border-steel-200 rounded-xl p-4 bg-steel-50">
+                            <div className="flex items-start gap-3">
+                              <input
+                                type="checkbox"
+                                id="includeCalculatorData"
+                                checked={includeCalculatorData}
+                                onChange={(e) => setIncludeCalculatorData(e.target.checked)}
+                                className="mt-1 w-4 h-4 text-primary-600 bg-white border-steel-300 rounded focus:ring-primary-500 focus:ring-2"
+                              />
+                              <div className="flex-1">
+                                <label htmlFor="includeCalculatorData" className="text-sm font-medium text-steel-900 cursor-pointer">
+                                  Include my calculator results with this message
+                                </label>
+                                <p className="text-xs text-steel-600 mt-1">
+                                  This will help us provide a more accurate quote based on your calculations
+                                </p>
+
+                                {/* Calculator Data Preview */}
+                                {includeCalculatorData && (
+                                  <div className="mt-3 p-3 bg-white border border-steel-200 rounded-lg text-xs">
+                                    <h4 className="font-semibold text-steel-900 mb-2">Calculator Results Preview:</h4>
+                                    <div className="grid grid-cols-2 gap-2 text-steel-700">
+                                      <div><span className="font-medium">Dimensions:</span> {width} × {height} {widthUnit}</div>
+                                      <div><span className="font-medium">Grill Type:</span> {grillType}</div>
+                                      <div><span className="font-medium">Metal Type:</span> {metalType}</div>
+                                      <div><span className="font-medium">Profile:</span> {profileType}</div>
+                                      <div><span className="font-medium">Est. Weight:</span> {weight.toFixed(2)} kg</div>
+                                      <div><span className="font-medium">Est. Cost:</span> ₹{cost.toFixed(2)}</div>
+                                      {showAdvancedCalculator && (
+                                        <>
+                                          <div><span className="font-medium">Design:</span> {designType}</div>
+                                          <div><span className="font-medium">Bar Spacing:</span> {barSpacing}"</div>
+                                          <div><span className="font-medium">Wastage:</span> {wastagePercent}%</div>
+                                          <div><span className="font-medium">Labor Rate:</span> ₹{laborRate}/sq.ft</div>
+                                        </>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <Button
                           type="submit"
                           size="lg"
