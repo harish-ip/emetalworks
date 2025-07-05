@@ -199,7 +199,7 @@ export default function AdminDashboard() {
   const updateContactStatus = async (contactId, status) => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -221,7 +221,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/note`, {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/note`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -242,7 +242,7 @@ export default function AdminDashboard() {
   const exportContacts = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/admin/export/contacts`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/export/contacts`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

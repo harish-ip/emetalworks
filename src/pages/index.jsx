@@ -48,6 +48,40 @@ const ServiceIcons = {
   ),
 };
 
+// Grill Type Icons for Calculator
+const GrillTypeIcons = {
+  window: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+    </svg>
+  ),
+  security: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  decorative: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+    </svg>
+  ),
+  balcony: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  ),
+  gate: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+    </svg>
+  ),
+  staircase: (
+    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+    </svg>
+  ),
+};
+
 // ===== PRICING CONFIGURATION SECTION =====
 // 🔧 EASILY UPDATE THESE RATES TO MANAGE PRICING
 const PRICING_CONFIG = {
@@ -793,34 +827,56 @@ export default function HomePage() {
 
                     </div>
 
-                    {/* Grill Type, Metal Type, and Profile Type Selection */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                      <div>
-                        <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                            </svg>
-                            Grill Type
-                          </span>
-                        </label>
-                        <select
-                          value={grillType}
-                          onChange={(e) => setGrillType(e.target.value)}
-                          className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white"
-                        >
-                          <option value="window">Window Grills</option>
-                          <option value="security">Security Grills</option>
-                          <option value="decorative">Decorative Grills</option>
-                          <option value="balcony">Balcony Railings</option>
-                          <option value="gate">Gate Grills</option>
-                          <option value="staircase">Staircase Railings</option>
-                        </select>
-                        <p className="text-xs text-steel-500 mt-1">
-                          Different types have varying complexity and pricing
-                        </p>
+                    {/* Grill Type Selection - Tiles */}
+                    <div className="mb-8">
+                      <h3 className="text-lg font-semibold text-steel-900 mb-4 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        Select Grill Type
+                      </h3>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                        {[
+                          { value: 'window', name: 'Window Grills', icon: GrillTypeIcons.window, color: 'accent' },
+                          { value: 'security', name: 'Security Grills', icon: GrillTypeIcons.security, color: 'success' },
+                          { value: 'decorative', name: 'Decorative Grills', icon: GrillTypeIcons.decorative, color: 'warning' },
+                          { value: 'balcony', name: 'Balcony Railings', icon: GrillTypeIcons.balcony, color: 'primary' },
+                          { value: 'gate', name: 'Gate Grills', icon: GrillTypeIcons.gate, color: 'steel' },
+                          { value: 'staircase', name: 'Staircase Railings', icon: GrillTypeIcons.staircase, color: 'primary' }
+                        ].map((type) => (
+                          <motion.div
+                            key={type.value}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`cursor-pointer p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
+                              grillType === type.value
+                                ? `border-${type.color}-500 bg-${type.color}-50 shadow-lg`
+                                : 'border-steel-200 bg-white hover:border-steel-300 hover:shadow-md'
+                            }`}
+                            onClick={() => setGrillType(type.value)}
+                          >
+                            <div className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 flex items-center justify-center rounded-lg ${
+                              grillType === type.value ? `bg-${type.color}-100` : 'bg-steel-100'
+                            }`}>
+                              <div className={grillType === type.value ? `text-${type.color}-600` : 'text-steel-600'}>
+                                {type.icon}
+                              </div>
+                            </div>
+                            <p className={`text-xs sm:text-sm font-medium text-center leading-tight ${
+                              grillType === type.value ? `text-${type.color}-700` : 'text-steel-700'
+                            }`}>
+                              {type.name}
+                            </p>
+                          </motion.div>
+                        ))}
                       </div>
+                      <p className="text-xs text-steel-500 mt-3 text-center">
+                        Different types have varying complexity and pricing
+                      </p>
+                    </div>
 
+                    {/* Metal Type and Profile Type Selection */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
                       <div>
                         <label className="block text-sm font-medium text-steel-700 mb-2">
                           <span className="flex items-center gap-2">

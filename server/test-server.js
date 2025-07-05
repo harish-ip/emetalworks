@@ -9,7 +9,7 @@ const PORT = process.env.PORT || 5007;
 
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:3001'],
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
   credentials: true
 }));
 app.use(express.json());
@@ -156,6 +156,58 @@ app.get('/api/admin/dashboard', (req, res) => {
   res.json({
     success: true,
     data: dashboardStats
+  });
+});
+
+// Update contact submission status
+app.put('/api/contact/submission/:id/status', (req, res) => {
+  console.log('📝 Updating contact status for ID:', req.params.id);
+  const { status } = req.body;
+
+  // Find and update the contact submission
+  const contactIndex = contactSubmissions.findIndex(c => c.id === req.params.id);
+  if (contactIndex !== -1) {
+    contactSubmissions[contactIndex].status = status;
+    console.log('✅ Status updated successfully');
+    res.json({ success: true, message: 'Status updated successfully' });
+  } else {
+    console.log('❌ Contact not found');
+    res.status(404).json({ success: false, message: 'Contact not found' });
+  }
+});
+
+// Add note to contact submission
+app.post('/api/contact/submission/:id/note', (req, res) => {
+  console.log('📝 Adding note to contact ID:', req.params.id);
+  const { note } = req.body;
+
+  // Find and update the contact submission
+  const contactIndex = contactSubmissions.findIndex(c => c.id === req.params.id);
+  if (contactIndex !== -1) {
+    if (!contactSubmissions[contactIndex].notes) {
+      contactSubmissions[contactIndex].notes = [];
+    }
+    contactSubmissions[contactIndex].notes.push({
+      note,
+      timestamp: new Date().toISOString(),
+      admin: 'admin'
+    });
+    console.log('✅ Note added successfully');
+    res.json({ success: true, message: 'Note added successfully' });
+  } else {
+    console.log('❌ Contact not found');
+    res.status(404).json({ success: false, message: 'Contact not found' });
+  }
+});
+
+// Export contacts (simplified)
+app.get('/api/admin/export/contacts', (req, res) => {
+  console.log('📤 Exporting contacts data');
+  res.json({
+    success: true,
+    data: contactSubmissions,
+    exportedAt: new Date().toISOString(),
+    totalRecords: contactSubmissions.length
   });
 });
 
