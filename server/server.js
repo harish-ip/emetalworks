@@ -13,6 +13,7 @@ const app = express();
 const userTrackingRoutes = require('./routes/userTracking');
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin');
+const calculatorSettingsRoutes = require('./routes/calculatorSettings');
 
 // Security middleware
 app.use(helmet());
@@ -29,7 +30,7 @@ app.use('/api/', limiter);
 
 // CORS configuration
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3002',
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
   credentials: true,
   optionsSuccessStatus: 200
 };
@@ -66,6 +67,7 @@ connectDB();
 app.use('/api/tracking', userTrackingRoutes);
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/calculator-settings', calculatorSettingsRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

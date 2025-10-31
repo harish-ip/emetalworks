@@ -5,7 +5,7 @@ import { Card, CardContent, CardTitle } from '../components/ui/card.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5007';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -57,6 +57,16 @@ export default function AdminDashboard() {
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Calculator settings state
+  const [calculatorSettings, setCalculatorSettings] = useState(null);
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [settingsForm, setSettingsForm] = useState({
+    mildSteel: 102,
+    stainlessSteel: 450,
+    aluminum: 280,
+    castIron: 85
+  });
+
   // Check if already authenticated
   useEffect(() => {
     console.log('useEffect: Checking authentication...');
@@ -79,18 +89,7 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      // Check for hardcoded admin credentials as fallback
-      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
-        // Fallback authentication when backend is not available
-        console.log('Using fallback authentication');
-        localStorage.setItem('admin_token', 'fallback-token-' + Date.now());
-        setIsAuthenticated(true);
-        loadDashboardData(); // Load dashboard data after successful login
-        loadContacts(); // Load contacts data after successful login
-        setLoading(false);
-        return;
-      }
-
+      console.log('🔐 Attempting login to backend...');
       const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: 'POST',
         headers: {
@@ -100,30 +99,20 @@ export default function AdminDashboard() {
       });
 
       const data = await response.json();
+      console.log('📥 Login response:', data);
 
       if (data.success) {
-        console.log('Login successful, setting authenticated to true');
+        console.log('✅ Login successful, token received');
         localStorage.setItem('admin_token', data.token);
         setIsAuthenticated(true);
-        console.log('Authentication state should now be true');
         loadDashboardData(); // Load dashboard data after successful login
         loadContacts(); // Load contacts data after successful login
       } else {
         setError(data.message || 'Login failed');
       }
     } catch (error) {
-      console.error('Login error:', error);
-
-      // Fallback authentication when backend is not available
-      if (loginForm.username === 'admin' && loginForm.password === 'admin123') {
-        console.log('Backend unavailable, using fallback authentication');
-        localStorage.setItem('admin_token', 'fallback-token-' + Date.now());
-        setIsAuthenticated(true);
-        loadDashboardData(); // Load dashboard data after successful login
-        loadContacts(); // Load contacts data after successful login
-      } else {
-        setError('Invalid credentials or server connection error.');
-      }
+      console.error('❌ Login error:', error);
+      setError('Server connection error. Please check if the backend is running.');
     } finally {
       setLoading(false);
     }
@@ -131,6 +120,7 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
   setLoading(true);
+  setError(null); // Clear any previous errors
   console.log('Loading dashboard data from API...');
 
   try {
@@ -146,197 +136,79 @@ export default function AdminDashboard() {
     // Load contact submissions
     const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`);
 
-    const dashboardData = await dashboardResponse.json();
-    const contactsData = await contactsResponse.json();
+    // Check HTTP status codes
+    const dashboardOk = dashboardResponse.ok;
+    const contactsOk = contactsResponse.ok;
+
+    console.log('Dashboard response status:', dashboardResponse.status, dashboardOk);
+    console.log('Contacts response status:', contactsResponse.status, contactsOk);
+
+    // Parse responses
+    const dashboardData = dashboardOk ? await dashboardResponse.json() : null;
+    const contactsData = contactsOk ? await contactsResponse.json() : null;
 
     console.log('Dashboard API response:', dashboardData);
     console.log('Contacts API response:', contactsData);
 
-    if (dashboardData.success && contactsData.success) {
+    // Handle different scenarios
+    if (contactsOk && contactsData.success) {
       const submissions = contactsData.data.submissions || [];
+      console.log('✅ Contacts loaded successfully:', submissions.length, 'submissions');
 
-      // Update dashboard data with real contact count
-      const updatedDashboardData = {
-        ...dashboardData.data,
-        totalContacts: submissions.length,
-        recentContacts: submissions.slice(-5).reverse() // Show 5 most recent
-      };
+      // If dashboard stats also loaded successfully
+      if (dashboardOk && dashboardData.success) {
+        console.log('✅ Dashboard stats loaded successfully');
 
-      console.log('Setting dashboard data:', updatedDashboardData);
+        // Update dashboard data with real contact count
+        const updatedDashboardData = {
+          ...dashboardData.data,
+          totalContacts: submissions.length,
+          recentContacts: submissions.slice(-5).reverse() // Show 5 most recent
+        };
+
+        console.log('Setting dashboard data:', updatedDashboardData);
+        setDashboardData(updatedDashboardData);
+      } else {
+        console.log('⚠️ Dashboard stats failed, using fallback stats with real contacts');
+
+        // Dashboard stats failed, but we have contacts - use fallback stats
+        setDashboardData({
+          totalVisits: 0,
+          totalContacts: submissions.length,
+          conversionRate: 0,
+          recentContacts: submissions.slice(-5).reverse()
+        });
+
+        // Only show error if token is invalid (401) - otherwise silent fallback
+        if (dashboardResponse.status === 401 || dashboardResponse.status === 403) {
+          setError('Session expired. Please login again.');
+          // Auto-logout on auth errors
+          setTimeout(() => {
+            handleLogout();
+          }, 2000);
+          return;
+        }
+      }
+
       console.log('Setting contacts data:', submissions);
       console.log('First contact sample:', submissions[0]);
       if (submissions[0]) {
         console.log('Calculator data in first contact:', submissions[0].calculatorData);
       }
-      setDashboardData(updatedDashboardData);
       setContacts(submissions);
+
+      // Clear any previous errors since we successfully loaded contacts
+      setError(null);
+
     } else {
+      // Both APIs failed
+      console.log('❌ Failed to load data from both APIs');
       setError('Failed to load dashboard data');
     }
   } catch (error) {
-    console.error('Dashboard API error:', error);
-    setError('Server offline - displaying demo data for testing');
-    // Set realistic demo data for development/demonstration
-    setDashboardData({
-      totalVisits: 1250,
-      totalContacts: 25,
-      conversionRate: 2.0,
-      recentContacts: [
-        {
-          id: 'demo-1',
-          name: 'Rajesh Kumar',
-          email: 'rajesh.kumar@email.com',
-          phone: '+91 98765 43210',
-          subject: 'Window Grill Quote Request',
-          message: 'Need window grills for 3BHK apartment in Kondapur',
-          projectType: 'window-grill',
-          submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-          calculatorData: {
-            dimensions: { width: 4, height: 5, area: 20 },
-            specifications: {
-              grillType: 'window',
-              rodThickness: '8mm',
-              spacingType: 'standard',
-              designComplexity: 'simple',
-              weightFactor: '1.30'
-            },
-            results: {
-              estimatedWeight: 26,
-              estimatedCost: 2652
-            },
-            calculatorType: 'dynamic_simple'
-          }
-        },
-        {
-          id: 'demo-2',
-          name: 'Priya Sharma',
-          email: 'priya.sharma@email.com',
-          phone: '+91 87654 32109',
-          subject: 'Security Grill Inquiry',
-          message: 'Heavy-duty security grills for commercial building',
-          projectType: 'security-grill',
-          submittedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), // 5 hours ago
-          calculatorData: {
-            dimensions: { width: 6, height: 8, area: 48 },
-            specifications: {
-              grillType: 'security',
-              rodThickness: '10mm',
-              spacingType: 'close',
-              designComplexity: 'simple',
-              weightFactor: '3.64'
-            },
-            results: {
-              estimatedWeight: 175,
-              estimatedCost: 17850
-            },
-            calculatorType: 'dynamic_simple'
-          }
-        },
-        {
-          id: 'demo-3',
-          name: 'Anil Reddy',
-          email: 'anil.reddy@email.com',
-          phone: '+91 76543 21098',
-          subject: 'Balcony Railing Project',
-          message: 'Decorative balcony railings for villa in Jubilee Hills',
-          projectType: 'balcony-railing',
-          submittedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-          calculatorData: {
-            dimensions: { width: 12, height: 3, area: 36 },
-            specifications: {
-              grillType: 'balcony',
-              rodThickness: '12mm',
-              spacingType: 'standard',
-              designComplexity: 'decorative',
-              weightFactor: '4.54'
-            },
-            results: {
-              estimatedWeight: 163,
-              estimatedCost: 16626
-            },
-            calculatorType: 'dynamic_simple'
-          }
-        }
-      ]
-    });
-    // Also set demo contacts data
-    setContacts([
-      {
-        id: 'demo-1',
-        name: 'Rajesh Kumar',
-        email: 'rajesh.kumar@email.com',
-        phone: '+91 98765 43210',
-        subject: 'Window Grill Quote Request',
-        message: 'Need window grills for 3BHK apartment in Kondapur. Looking for standard 8mm square rods with professional installation.',
-        projectType: 'window-grill',
-        submittedAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-        calculatorData: {
-          dimensions: { width: 4, height: 5, area: 20 },
-          specifications: {
-            grillType: 'window',
-            rodThickness: '8mm',
-            spacingType: 'standard',
-            designComplexity: 'simple',
-            weightFactor: '1.30'
-          },
-          results: {
-            estimatedWeight: 26,
-            estimatedCost: 2652
-          },
-          calculatorType: 'dynamic_simple'
-        }
-      },
-      {
-        id: 'demo-2',
-        name: 'Priya Sharma',
-        email: 'priya.sharma@email.com',
-        phone: '+91 87654 32109',
-        subject: 'Security Grill Inquiry',
-        message: 'Heavy-duty security grills required for commercial building in Gachibowli. Need close spacing for maximum security.',
-        projectType: 'security-grill',
-        submittedAt: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-        calculatorData: {
-          dimensions: { width: 6, height: 8, area: 48 },
-          specifications: {
-            grillType: 'security',
-            rodThickness: '10mm',
-            spacingType: 'close',
-            designComplexity: 'simple',
-            weightFactor: '3.64'
-          },
-          results: {
-            estimatedWeight: 175,
-            estimatedCost: 17850
-          },
-          calculatorType: 'dynamic_simple'
-        }
-      },
-      {
-        id: 'demo-3',
-        name: 'Anil Reddy',
-        email: 'anil.reddy@email.com',
-        phone: '+91 76543 21098',
-        subject: 'Balcony Railing Project',
-        message: 'Decorative balcony railings for luxury villa in Jubilee Hills. Looking for artistic design with structural integrity.',
-        projectType: 'balcony-railing',
-        submittedAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-        calculatorData: {
-          dimensions: { width: 12, height: 3, area: 36 },
-          specifications: {
-            grillType: 'balcony',
-            rodThickness: '12mm',
-            spacingType: 'standard',
-            designComplexity: 'decorative',
-            weightFactor: '4.54'
-          },
-          results: {
-            estimatedWeight: 163,
-            estimatedCost: 16626
-          },
-          calculatorType: 'dynamic_simple'
-        }
-      }
-    ]);
+    console.error('❌ Dashboard API error:', error);
+    setError('Server connection error. Please check if the backend is running.');
+    // Don't set demo data - show error instead
   } finally {
     setLoading(false);
   }
@@ -438,6 +310,63 @@ export default function AdminDashboard() {
       }
     } catch (error) {
       console.error('Failed to export contacts:', error);
+    }
+  };
+
+  // Load calculator settings
+  const loadCalculatorSettings = async () => {
+    try {
+      console.log('📊 Loading calculator settings...');
+      const response = await fetch(`${API_BASE_URL}/api/calculator-settings`);
+      const data = await response.json();
+
+      if (data.success && data.data) {
+        console.log('✅ Calculator settings loaded:', data.data);
+        setCalculatorSettings(data.data);
+        setSettingsForm({
+          mildSteel: data.data.materialRates.mildSteel,
+          stainlessSteel: data.data.materialRates.stainlessSteel,
+          aluminum: data.data.materialRates.aluminum,
+          castIron: data.data.materialRates.castIron
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error loading calculator settings:', error);
+    }
+  };
+
+  // Update calculator settings
+  const updateCalculatorSettings = async () => {
+    try {
+      setLoading(true);
+      console.log('🔧 Updating calculator settings...');
+
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/api/calculator-settings/material-rates`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(settingsForm)
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        console.log('✅ Calculator settings updated successfully');
+        setCalculatorSettings(data.data);
+        setEditingSettings(false);
+        alert('Calculator settings updated successfully!');
+      } else {
+        console.error('❌ Failed to update settings:', data.message);
+        alert('Failed to update settings: ' + data.message);
+      }
+    } catch (error) {
+      console.error('❌ Error updating calculator settings:', error);
+      alert('Error updating settings. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -558,6 +487,16 @@ export default function AdminDashboard() {
             className="flex items-center gap-2"
           >
             📈 Analytics
+          </Button>
+          <Button
+            variant={activeView === 'settings' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveView('settings');
+              loadCalculatorSettings(); // Load settings when switching to settings view
+            }}
+            className="flex items-center gap-2"
+          >
+            ⚙️ Calculator Settings
           </Button>
           <Button
             variant="outline"
@@ -776,10 +715,12 @@ export default function AdminDashboard() {
                                     {contact.calculatorData.grillType || contact.calculatorData.specifications?.grillType}
                                   </div>
                                 )}
-                                {contact.calculatorData.metalType && (
+                                {(contact.calculatorData.specifications?.materialType || contact.calculatorData.metalType) && (
                                   <div>
-                                    <span className="font-medium">Metal Type: </span>
-                                    {contact.calculatorData.metalType}
+                                    <span className="font-medium">Material: </span>
+                                    {contact.calculatorData.specifications?.materialType === 'mildSteel' ? 'Mild Steel (MS)' :
+                                     contact.calculatorData.specifications?.materialType === 'stainlessSteel' ? 'Stainless Steel (SS)' :
+                                     contact.calculatorData.metalType}
                                   </div>
                                 )}
                                 {contact.calculatorData.profileType && (
@@ -828,6 +769,12 @@ export default function AdminDashboard() {
                                   <div>
                                     <span className="font-medium">Weight Factor: </span>
                                     {contact.calculatorData.specifications.weightFactor} kg/sq.ft
+                                  </div>
+                                )}
+                                {contact.calculatorData.results?.materialRate && (
+                                  <div>
+                                    <span className="font-medium">Material Rate: </span>
+                                    ₹{contact.calculatorData.results.materialRate}/kg
                                   </div>
                                 )}
                               </div>
@@ -947,6 +894,199 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Calculator Settings View */}
+        {activeView === 'settings' && (
+          <div>
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <CardTitle>Calculator Settings</CardTitle>
+                  {!editingSettings ? (
+                    <Button
+                      onClick={() => setEditingSettings(true)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      ✏️ Edit Settings
+                    </Button>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          setEditingSettings(false);
+                          if (calculatorSettings) {
+                            setSettingsForm({
+                              mildSteel: calculatorSettings.materialRates.mildSteel,
+                              stainlessSteel: calculatorSettings.materialRates.stainlessSteel,
+                              aluminum: calculatorSettings.materialRates.aluminum,
+                              castIron: calculatorSettings.materialRates.castIron
+                            });
+                          }
+                        }}
+                        variant="outline"
+                      >
+                        ❌ Cancel
+                      </Button>
+                      <Button
+                        onClick={updateCalculatorSettings}
+                        disabled={loading}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {loading ? '⏳ Saving...' : '💾 Save Changes'}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {calculatorSettings && (
+                  <div className="space-y-6">
+                    {/* Material Rates Section */}
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4 text-steel-800">Material Rates (per kg)</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Mild Steel */}
+                        <div className="p-4 border rounded-lg bg-steel-50">
+                          <label className="block text-sm font-medium text-steel-700 mb-2">
+                            Mild Steel (MS)
+                          </label>
+                          {editingSettings ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">₹</span>
+                              <input
+                                type="number"
+                                value={settingsForm.mildSteel}
+                                onChange={(e) => setSettingsForm({
+                                  ...settingsForm,
+                                  mildSteel: parseFloat(e.target.value) || 0
+                                })}
+                                className="flex-1 px-3 py-2 border border-steel-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-steel-500"
+                                min="0"
+                                step="1"
+                              />
+                              <span className="text-sm text-steel-600">/kg</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xl font-bold text-steel-800">
+                              ₹{calculatorSettings.materialRates.mildSteel}/kg
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Stainless Steel */}
+                        <div className="p-4 border rounded-lg bg-steel-50">
+                          <label className="block text-sm font-medium text-steel-700 mb-2">
+                            Stainless Steel (SS)
+                          </label>
+                          {editingSettings ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">₹</span>
+                              <input
+                                type="number"
+                                value={settingsForm.stainlessSteel}
+                                onChange={(e) => setSettingsForm({
+                                  ...settingsForm,
+                                  stainlessSteel: parseFloat(e.target.value) || 0
+                                })}
+                                className="flex-1 px-3 py-2 border border-steel-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-steel-500"
+                                min="0"
+                                step="1"
+                              />
+                              <span className="text-sm text-steel-600">/kg</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xl font-bold text-steel-800">
+                              ₹{calculatorSettings.materialRates.stainlessSteel}/kg
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Aluminum */}
+                        <div className="p-4 border rounded-lg bg-steel-50">
+                          <label className="block text-sm font-medium text-steel-700 mb-2">
+                            Aluminum
+                          </label>
+                          {editingSettings ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">₹</span>
+                              <input
+                                type="number"
+                                value={settingsForm.aluminum}
+                                onChange={(e) => setSettingsForm({
+                                  ...settingsForm,
+                                  aluminum: parseFloat(e.target.value) || 0
+                                })}
+                                className="flex-1 px-3 py-2 border border-steel-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-steel-500"
+                                min="0"
+                                step="1"
+                              />
+                              <span className="text-sm text-steel-600">/kg</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xl font-bold text-steel-800">
+                              ₹{calculatorSettings.materialRates.aluminum}/kg
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Cast Iron */}
+                        <div className="p-4 border rounded-lg bg-steel-50">
+                          <label className="block text-sm font-medium text-steel-700 mb-2">
+                            Cast Iron
+                          </label>
+                          {editingSettings ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-lg">₹</span>
+                              <input
+                                type="number"
+                                value={settingsForm.castIron}
+                                onChange={(e) => setSettingsForm({
+                                  ...settingsForm,
+                                  castIron: parseFloat(e.target.value) || 0
+                                })}
+                                className="flex-1 px-3 py-2 border border-steel-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-steel-500"
+                                min="0"
+                                step="1"
+                              />
+                              <span className="text-sm text-steel-600">/kg</span>
+                            </div>
+                          ) : (
+                            <div className="text-2xl font-bold text-steel-800">
+                              ₹{calculatorSettings.materialRates.castIron}/kg
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Metadata */}
+                    <div className="pt-4 border-t border-steel-200">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-steel-600">
+                        <div>
+                          <span className="font-medium">Last Updated:</span>{' '}
+                          {new Date(calculatorSettings.lastUpdatedAt).toLocaleString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Updated By:</span>{' '}
+                          {calculatorSettings.lastUpdatedBy}
+                        </div>
+                        <div>
+                          <span className="font-medium">Version:</span>{' '}
+                          {calculatorSettings.version}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {!calculatorSettings && (
+                  <div className="text-center py-8 text-steel-500">
+                    <p>Loading calculator settings...</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

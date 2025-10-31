@@ -19,7 +19,7 @@ const contactSubmissionSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Phone number is required'],
     trim: true,
-    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
+    match: [/^[\+]?[\d\s\-\(\)]{7,20}$/, 'Please enter a valid phone number']
   },
   
   // Message details
@@ -39,7 +39,7 @@ const contactSubmissionSchema = new mongoose.Schema({
   // Project details (if provided)
   projectType: {
     type: String,
-    enum: ['window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'gate', 'staircase', 'custom', 'other'],
+    enum: ['window-grill', 'security-grill', 'decorative-grill', 'balcony-railing', 'gate-fabrication', 'staircase-railing', 'custom', 'other'],
     default: 'other'
   },
   projectBudget: {
@@ -58,18 +58,32 @@ const contactSubmissionSchema = new mongoose.Schema({
     dimensions: {
       width: Number,
       height: Number,
+      area: Number,
       widthUnit: String,
       heightUnit: String
     },
+    specifications: {
+      grillType: String,
+      metalType: String,
+      profileType: String,
+      rodThickness: String,
+      spacingType: String,
+      designComplexity: String,
+      materialType: String,
+      weightFactor: String
+    },
+    results: {
+      estimatedWeight: Number,
+      estimatedCost: Number,
+      materialRate: Number
+    },
+    // Legacy fields for backward compatibility
     grillType: String,
     metalType: String,
     profileType: String,
     estimatedWeight: Number,
     estimatedCost: Number,
-    calculatorType: {
-      type: String,
-      enum: ['standard', 'advanced']
-    }
+    calculatorType: String
   },
   
   // Tracking information

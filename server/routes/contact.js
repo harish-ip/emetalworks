@@ -7,26 +7,43 @@ const Joi = require('joi');
 const contactSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   email: Joi.string().email().required(),
-  phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
+  phone: Joi.string().pattern(/^[\+]?[\d\s\-\(\)]{7,20}$/).required(),
   subject: Joi.string().trim().min(5).max(200).required(),
   message: Joi.string().trim().min(10).max(2000).required(),
-  projectType: Joi.string().valid('window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'gate', 'staircase', 'custom', 'other').optional(),
+  projectType: Joi.string().valid('window-grill', 'security-grill', 'decorative-grill', 'balcony-railing', 'gate-fabrication', 'staircase-railing', 'custom', 'other').optional(),
   projectBudget: Joi.string().valid('under_10k', '10k_25k', '25k_50k', '50k_100k', 'above_100k', 'not_specified').optional(),
   urgency: Joi.string().valid('immediate', 'within_week', 'within_month', 'flexible').optional(),
   calculatorData: Joi.object({
     dimensions: Joi.object({
       width: Joi.number().positive().optional(),
       height: Joi.number().positive().optional(),
+      area: Joi.number().positive().optional(),
       widthUnit: Joi.string().valid('cm', 'inches', 'feet').optional(),
       heightUnit: Joi.string().valid('cm', 'inches', 'feet').optional()
     }).optional(),
+    specifications: Joi.object({
+      grillType: Joi.string().optional(),
+      metalType: Joi.string().optional(),
+      profileType: Joi.string().optional(),
+      rodThickness: Joi.string().optional(),
+      spacingType: Joi.string().optional(),
+      designComplexity: Joi.string().optional(),
+      materialType: Joi.string().valid('mildSteel', 'stainlessSteel').optional(),
+      weightFactor: Joi.string().optional()
+    }).optional(),
+    results: Joi.object({
+      estimatedWeight: Joi.number().positive().optional(),
+      estimatedCost: Joi.number().positive().optional(),
+      materialRate: Joi.number().positive().optional()
+    }).optional(),
+    // Legacy fields for backward compatibility
     grillType: Joi.string().optional(),
     metalType: Joi.string().optional(),
     profileType: Joi.string().optional(),
     estimatedWeight: Joi.number().positive().optional(),
     estimatedCost: Joi.number().positive().optional(),
-    calculatorType: Joi.string().valid('standard', 'advanced').optional()
-  }).optional(),
+    calculatorType: Joi.string().optional()
+  }).optional().allow(null),
   sessionId: Joi.string().required(),
   visitorId: Joi.string().required(),
   source: Joi.string().valid('website_contact', 'calculator_quote', 'service_inquiry', 'direct').optional()
@@ -37,8 +54,9 @@ router.post('/submit', async (req, res) => {
   try {
     // Validate request data
     const { error, value } = contactSchema.validate(req.body);
-    
+
     if (error) {
+      console.error('❌ Validation error:', error.details);
       return res.status(400).json({
         success: false,
         message: 'Validation error',
