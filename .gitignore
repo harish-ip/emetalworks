@@ -93,3 +93,8 @@ temp/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Test scripts (local testing only)
+test-*.ps1
+test-*.js
+test-*.html

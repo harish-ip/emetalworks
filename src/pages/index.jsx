@@ -12,6 +12,8 @@ import {
   trackInteraction
 } from '../utils/analytics';
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5003';
+
 function HomePage() {
   // Initialize analytics
   useEffect(() => {
@@ -25,11 +27,77 @@ function HomePage() {
   const [width, setWidth] = useState('');
   const [height, setHeight] = useState('');
 
+  // Add unit state if not already present
+  const [unit, setUnit] = useState('feet');
+
+  // Calculator settings state
+  const [calculatorSettings, setCalculatorSettings] = useState(null);
+  const [materialRate, setMaterialRate] = useState(102); // Default fallback rate
+
   // Dynamic weight factor calculation state
-  const [grillType, setGrillType] = useState('window'); // window, security, decorative, balcony
+  const [grillType, setGrillType] = useState('window'); // window, security, gate, balcony
   const [rodThickness, setRodThickness] = useState('8mm'); // 8mm, 10mm, 12mm
   const [spacingType, setSpacingType] = useState('standard'); // standard, close, wide
   const [designComplexity, setDesignComplexity] = useState('simple'); // simple, cross, decorative
+  const [materialType, setMaterialType] = useState('mildSteel'); // mildSteel, stainlessSteel
+
+  // Fetch calculator settings on component mount
+  useEffect(() => {
+    const fetchCalculatorSettings = async () => {
+      try {
+        console.log('📊 Fetching calculator settings from backend...');
+        const response = await fetch(`${API_BASE_URL}/api/calculator-settings`);
+        const data = await response.json();
+
+        if (data.success && data.data) {
+          console.log('✅ Calculator settings loaded:', data.data);
+          setCalculatorSettings(data.data);
+          // Set material rate for mild steel (default)
+          setMaterialRate(data.data.materialRates.mildSteel);
+        } else {
+          console.warn('⚠️ Failed to load calculator settings, using defaults');
+        }
+      } catch (error) {
+        console.error('❌ Error fetching calculator settings:', error);
+        console.log('Using default material rate: ₹102/kg');
+      }
+    };
+
+    fetchCalculatorSettings();
+  }, []);
+
+  // Update material rate when material type changes
+  useEffect(() => {
+    if (calculatorSettings) {
+      const newRate = materialType === 'mildSteel'
+        ? calculatorSettings.materialRates.mildSteel
+        : calculatorSettings.materialRates.stainlessSteel;
+      setMaterialRate(newRate);
+      console.log(`🔧 Material type changed to ${materialType}, rate updated to ₹${newRate}/kg`);
+    }
+  }, [materialType, calculatorSettings]);
+  
+  // Quick dimension presets
+  const dimensionPresets = {
+    feet: [
+      { width: '4', height: '5', label: '4×5 ft (Standard Window)' },
+      { width: '5', height: '6', label: '5×6 ft (Large Window)' },
+      { width: '3', height: '4', label: '3×4 ft (Small Window)' },
+      { width: '6', height: '8', label: '6×8 ft (Door/Balcony)' }
+    ],
+    cm: [
+      { width: '120', height: '150', label: '120×150 cm (Standard)' },
+      { width: '150', height: '180', label: '150×180 cm (Large)' },
+      { width: '90', height: '120', label: '90×120 cm (Small)' },
+      { width: '180', height: '240', label: '180×240 cm (Door)' }
+    ]
+  };
+
+  // Handle preset selection
+  const handlePresetSelect = (preset) => {
+    setWidth(preset.width);
+    setHeight(preset.height);
+  };
 
   // Contact form state
   const [contactForm, setContactForm] = useState({
@@ -56,8 +124,8 @@ function HomePage() {
       case 'security':
         baseFactor = 2.0;
         break;
-      case 'decorative':
-        baseFactor = 1.2;
+      case 'gate':
+        baseFactor = 2.5;
         break;
       case 'balcony':
         baseFactor = 2.8;
@@ -118,7 +186,7 @@ function HomePage() {
   const weightFactor = calculateWeightFactor();
   const area = width && height ? parseFloat(width) * parseFloat(height) : 0;
   const estimatedWeight = area * weightFactor;
-  const estimatedCost = estimatedWeight * 102; // ₹102/kg
+  const estimatedCost = estimatedWeight * materialRate; // Use dynamic material rate
 
   // Auto-update contact form project type when grill type changes
   useEffect(() => {
@@ -126,9 +194,8 @@ function HomePage() {
     const projectTypeMap = {
       'window': 'window-grill',
       'security': 'security-grill',
-      'decorative': 'decorative-grill',
-      'balcony': 'balcony-railing',
       'gate': 'gate-fabrication',
+      'balcony': 'balcony-railing',
       'staircase': 'staircase-railing'
     };
 
@@ -147,14 +214,16 @@ function HomePage() {
         const shouldUpdateSubject = !prev.subject.trim();
         const shouldUpdateMessage = !prev.message.trim();
 
+        const materialTypeName = materialType === 'mildSteel' ? 'Mild Steel (MS)' : 'Stainless Steel (SS)';
+
         return {
           ...prev,
           subject: shouldUpdateSubject ? `${grillType.charAt(0).toUpperCase() + grillType.slice(1)} Grill Quote Request` : prev.subject,
-          message: shouldUpdateMessage ? `Hi, I'm interested in getting a quote for ${grillType} grills. Based on the calculator, I need:\n\n• Dimensions: ${width} × ${height} feet (${area.toFixed(1)} sq.ft)\n• Grill Type: ${grillType}\n• Rod Thickness: ${rodThickness}\n• Spacing: ${spacingType}\n• Design: ${designComplexity}\n• Estimated Weight: ${Math.round(estimatedWeight)} kg\n• Estimated Cost: ₹${Math.round(estimatedCost)}\n\nPlease provide a detailed quote for this project. Thank you!` : prev.message
+          message: shouldUpdateMessage ? `Hi, I'm interested in getting a quote for ${grillType} grills. Based on the calculator, I need:\n\n• Dimensions: ${width} × ${height} feet (${area.toFixed(1)} sq.ft)\n• Material: ${materialTypeName}\n• Grill Type: ${grillType}\n• Rod Thickness: ${rodThickness}\n• Spacing: ${spacingType}\n• Design: ${designComplexity}\n• Estimated Weight: ${Math.round(estimatedWeight)} kg\n• Estimated Cost: ₹${Math.round(estimatedCost)}\n\nPlease provide a detailed quote for this project. Thank you!` : prev.message
         };
       });
     }
-  }, [includeCalculatorData, width, height, area, rodThickness, spacingType, designComplexity, estimatedWeight, estimatedCost, grillType]);
+  }, [includeCalculatorData, width, height, area, rodThickness, spacingType, designComplexity, estimatedWeight, estimatedCost, grillType, materialType]);
 
   // Handle tab switching
   const handleTabSwitch = (tabId) => {
@@ -178,11 +247,55 @@ function HomePage() {
     setSubmitStatus(null);
 
     try {
+      // Frontend validation
+      const validationErrors = [];
+
+      if (contactForm.subject.trim().length < 5) {
+        validationErrors.push('Subject must be at least 5 characters long');
+      }
+
+      if (contactForm.message.trim().length < 10) {
+        validationErrors.push('Message must be at least 10 characters long');
+      }
+
+      // Validate phone number - must have at least 10 digits
+      const phoneDigits = contactForm.phone.replace(/\D/g, ''); // Remove all non-digit characters
+      if (phoneDigits.length < 10) {
+        validationErrors.push('Phone number must contain at least 10 digits');
+      }
+
+      if (validationErrors.length > 0) {
+        alert('Please fix the following errors:\n\n' + validationErrors.join('\n'));
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Check if calculator results are available but not included
+      const hasCalculatorResults = width > 0 && height > 0;
+      let shouldIncludeCalculator = includeCalculatorData;
+
+      if (hasCalculatorResults && !includeCalculatorData) {
+        const userWantsToInclude = window.confirm(
+          `You have calculator results available:\n\n` +
+          `• Dimensions: ${width} × ${height} feet (${area.toFixed(1)} sq.ft)\n` +
+          `• Estimated Weight: ${Math.round(estimatedWeight)} kg\n` +
+          `• Estimated Cost: ₹${Math.round(estimatedCost)}\n\n` +
+          `Would you like to include these results with your message for a more accurate quote?`
+        );
+
+        if (userWantsToInclude) {
+          // User wants to include calculator data
+          shouldIncludeCalculator = true;
+          setIncludeCalculatorData(true);
+        }
+        // If user clicks "No", continue with submission without calculator data
+      }
+
       // Track form submission attempt
       await trackContactFormInteraction('form_submit', contactForm);
 
       // Prepare calculator data if available and user wants to include it
-      const calculatorData = (includeCalculatorData && width > 0 && height > 0) ? {
+      const calculatorData = (shouldIncludeCalculator && width > 0 && height > 0) ? {
         dimensions: {
           width: parseFloat(width),
           height: parseFloat(height),
@@ -193,11 +306,13 @@ function HomePage() {
           rodThickness,
           spacingType,
           designComplexity,
+          materialType,
           weightFactor: weightFactor.toFixed(2)
         },
         results: {
           estimatedWeight: Math.round(estimatedWeight),
-          estimatedCost: Math.round(estimatedCost)
+          estimatedCost: Math.round(estimatedCost),
+          materialRate: materialRate
         },
         calculatorType: 'dynamic_simple'
       } : null;
@@ -223,6 +338,11 @@ function HomePage() {
 
     } catch (error) {
       console.error('Contact form submission error:', error);
+
+      // Show specific error message if available
+      const errorMessage = error.message || 'Failed to submit contact form. Please try again.';
+      alert('Error: ' + errorMessage);
+
       setSubmitStatus('error');
     } finally {
       setIsSubmitting(false);
@@ -385,18 +505,6 @@ function HomePage() {
                       }
                     },
                     {
-                      title: 'Decorative Grills',
-                      description: 'Artistic decorative grills with custom patterns and designs. Perfect for enhancing your property aesthetics.',
-                      icon: '🎨',
-                      features: ['Custom Patterns', 'Artistic Designs', 'Premium Finish', 'Aesthetic Appeal'],
-                      price: 'From ₹150/sq.ft',
-                      action: () => {
-                        setGrillType('decorative');
-                        setDesignComplexity('decorative');
-                        handleTabSwitch('calculator');
-                      }
-                    },
-                    {
                       title: 'Balcony Railings',
                       description: 'Structural balcony railings with safety compliance. Heavy-duty construction for residential and commercial use.',
                       icon: '🏗️',
@@ -415,7 +523,9 @@ function HomePage() {
                       features: ['Custom Sizes', 'Manual/Auto Options', 'Security Features', 'Durable Construction'],
                       price: 'From ₹350/sq.ft',
                       action: () => {
-                        handleTabSwitch('contact');
+                        setGrillType('gate');
+                        setRodThickness('12mm');
+                        handleTabSwitch('calculator');
                       }
                     },
                     {
@@ -629,61 +739,173 @@ function HomePage() {
                       </p>
                     </div>
 
+                    {/* Unit Selection and Grill Type - Combined Row */}
+                    <div className="mb-6">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* Grill Type Selection Tiles */}
+                        <div>
+                          <label className="block text-sm font-bold text-steel-700 mb-3">Grill Type</label>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setGrillType('window')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                grillType === 'window'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              <div className="text-lg mb-1">🪟</div>
+                              <div className="text-xs font-medium">Window</div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGrillType('security')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                grillType === 'security'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              <div className="text-lg mb-1">🔒</div>
+                              <div className="text-xs font-medium">Security</div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGrillType('gate')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                grillType === 'gate'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              <div className="text-lg mb-1">🚪</div>
+                              <div className="text-xs font-medium">Gate</div>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setGrillType('balcony')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                grillType === 'balcony'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              <div className="text-lg mb-1">🏗️</div>
+                              <div className="text-xs font-medium">Balcony</div>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Unit Selection */}
+                        <div>
+                          <label className="block text-sm font-bold text-steel-700 mb-3">Unit</label>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setUnit('feet')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                unit === 'feet'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              Feet
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setUnit('cm')}
+                              className={`px-3 py-2 rounded-lg border transition-all text-center ${
+                                unit === 'cm'
+                                  ? 'bg-primary-600 text-white border-primary-600'
+                                  : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                              }`}
+                            >
+                              Centimeters
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Material Type Selection */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-bold text-steel-700 mb-3">Material Type</label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setMaterialType('mildSteel')}
+                          className={`px-4 py-3 rounded-lg border transition-all text-center ${
+                            materialType === 'mildSteel'
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">🔩</div>
+                          <div className="text-sm font-medium">Mild Steel (MS)</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setMaterialType('stainlessSteel')}
+                          className={`px-4 py-3 rounded-lg border transition-all text-center ${
+                            materialType === 'stainlessSteel'
+                              ? 'bg-primary-600 text-white border-primary-600'
+                              : 'bg-white text-steel-700 border-steel-300 hover:border-primary-300'
+                          }`}
+                        >
+                          <div className="text-2xl mb-1">✨</div>
+                          <div className="text-sm font-medium">Stainless Steel (SS)</div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick Presets */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-bold text-steel-700 mb-3">Quick Select</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {dimensionPresets[unit].map((preset, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handlePresetSelect(preset)}
+                            className="px-3 py-2 text-sm bg-steel-50 hover:bg-primary-50 border border-steel-200 hover:border-primary-300 rounded-lg transition-all"
+                          >
+                            {preset.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
                     {/* Dimensions Input */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
                       <div>
                         <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            Width (feet)
-                          </span>
+                          Width ({unit})
                         </label>
                         <input
                           type="number"
                           value={width}
                           onChange={(e) => setWidth(e.target.value)}
-                          placeholder="Enter width in feet"
+                          placeholder={`Enter width in ${unit}`}
                           className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
                         />
                       </div>
-
                       <div>
                         <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            Height (feet)
-                          </span>
+                          Height ({unit})
                         </label>
                         <input
                           type="number"
                           value={height}
                           onChange={(e) => setHeight(e.target.value)}
-                          placeholder="Enter height in feet"
+                          placeholder={`Enter height in ${unit}`}
                           className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
                         />
                       </div>
                     </div>
 
                     {/* Dynamic Specifications */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                      <div>
-                        <label className="block text-sm font-medium text-steel-700 mb-2">Grill Type</label>
-                        <select
-                          value={grillType}
-                          onChange={(e) => setGrillType(e.target.value)}
-                          className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-                        >
-                          <option value="window">Window Grill (1.3x base)</option>
-                          <option value="security">Security Grill (2.0x base)</option>
-                          <option value="decorative">Decorative Grill (1.2x base)</option>
-                          <option value="balcony">Balcony Railing (2.8x base)</option>
-                        </select>
-                      </div>
-
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
                       <div>
                         <label className="block text-sm font-medium text-steel-700 mb-2">Rod Thickness</label>
                         <select
@@ -731,7 +953,7 @@ function HomePage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
                           <div className="bg-white rounded-lg p-3">
                             <div className="text-blue-600 font-medium">Base Factor</div>
-                            <div className="text-blue-800">{grillType === 'window' ? '1.3' : grillType === 'security' ? '2.0' : grillType === 'decorative' ? '1.2' : '2.8'} kg/sq.ft</div>
+                            <div className="text-blue-800">{grillType === 'window' ? '1.3' : grillType === 'security' ? '2.0' : grillType === 'gate' ? '2.5' : '2.8'} kg/sq.ft</div>
                           </div>
                           <div className="bg-white rounded-lg p-3">
                             <div className="text-blue-600 font-medium">Rod Thickness</div>
@@ -778,7 +1000,7 @@ function HomePage() {
                           <div className="text-sm text-steel-600 space-y-1">
                             <div>• Area: {width} × {height} = {area.toFixed(1)} sq.ft</div>
                             <div>• Dynamic weight factor: {weightFactor.toFixed(2)} kg/sq.ft</div>
-                            <div>• Material rate: ₹102/kg (mild steel)</div>
+                            <div>• Material rate: ₹{materialRate}/kg ({materialType === 'mildSteel' ? 'mild steel' : 'stainless steel'})</div>
                             <div>• Type: {grillType} with {rodThickness} rods, {spacingType} spacing, {designComplexity} design</div>
                           </div>
                         </div>
@@ -917,20 +1139,25 @@ function HomePage() {
                               <option value="window-grill">Window Grill</option>
                               <option value="security-grill">Security Grill</option>
                               <option value="balcony-railing">Balcony Railing</option>
-                              <option value="decorative-grill">Decorative Grill</option>
+                              <option value="gate-fabrication">Gate Fabrication</option>
+                              <option value="staircase-railing">Staircase Railing</option>
                               <option value="other">Other</option>
                             </select>
                           </div>
                         </div>
-                        <Input
-                          type="text"
-                          name="subject"
-                          value={contactForm.subject}
-                          onChange={handleContactInputChange}
-                          placeholder="Brief description of your project"
-                          label="Subject"
-                          required
-                        />
+                        <div>
+                          <Input
+                            type="text"
+                            name="subject"
+                            value={contactForm.subject}
+                            onChange={handleContactInputChange}
+                            placeholder="Brief description of your project"
+                            label="Subject"
+                            required
+                            minLength={5}
+                          />
+                          <p className="text-xs text-steel-500 mt-1">Minimum 5 characters</p>
+                        </div>
                         <div>
                           <label className="block text-sm font-medium text-steel-700 mb-2">Message</label>
                           <textarea
@@ -941,11 +1168,15 @@ function HomePage() {
                             placeholder="Tell us more about your project requirements, dimensions, timeline, etc."
                             className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 resize-none"
                             required
+                            minLength={10}
                           />
+                          <p className="text-xs text-steel-500 mt-1">Minimum 10 characters ({contactForm.message.length}/10)</p>
                         </div>
 
                         {/* Include Calculator Data Option */}
-                        {width > 0 && height > 0 && (
+                        {/* Only show calculator checkbox for project types that support calculator */}
+                        {width > 0 && height > 0 &&
+                         !['staircase-railing', 'other'].includes(contactForm.projectType) && (
                           <div className="border border-steel-200 rounded-xl p-4">
                             <div className="flex items-start gap-3">
                               <input
@@ -974,9 +1205,11 @@ function HomePage() {
                                 <h4 className="font-semibold text-steel-900 mb-2">Calculator Results Preview:</h4>
                                 <div className="grid grid-cols-2 gap-2 text-steel-700 mb-3">
                                   <div><span className="font-medium">Dimensions:</span> {width} × {height} ft</div>
+                                  <div><span className="font-medium">Material:</span> {materialType === 'mildSteel' ? 'Mild Steel' : 'Stainless Steel'}</div>
                                   <div><span className="font-medium">Grill Type:</span> {grillType}</div>
                                   <div><span className="font-medium">Rod Thickness:</span> {rodThickness}</div>
                                   <div><span className="font-medium">Weight Factor:</span> {weightFactor.toFixed(2)} kg/sq.ft</div>
+                                  <div><span className="font-medium">Material Rate:</span> ₹{materialRate}/kg</div>
                                   <div><span className="font-medium">Est. Weight:</span> {Math.round(estimatedWeight)} kg</div>
                                   <div><span className="font-medium">Est. Cost:</span> ₹{Math.round(estimatedCost)}</div>
                                 </div>
