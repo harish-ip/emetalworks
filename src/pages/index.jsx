@@ -3,14 +3,7 @@ import { motion } from 'framer-motion';
 import { Button } from '../components/ui/button.jsx';
 import { Card, CardContent, CardTitle, CardDescription } from '../components/ui/card.jsx';
 import { Input } from '../components/ui/input.jsx';
-import {
-  initializeTracking,
-  trackTabSwitch,
-  trackCalculatorUsage,
-  trackContactFormInteraction,
-  submitContactForm,
-  trackInteraction
-} from '../utils/analytics';
+import { submitContactForm } from '../utils/api';
 
 // Service Icons
 const ServiceIcons = {
@@ -109,16 +102,10 @@ export default function HomePage() {
   const [height, setHeight] = useState(0);
   const [activeTab, setActiveTab] = useState('home');
 
-  // Initialize tracking when component mounts
-  useEffect(() => {
-    initializeTracking();
-  }, []);
 
-  // Helper function to handle tab switching with tracking
+  // Helper function to handle tab switching
   const handleTabSwitch = (newTab) => {
-    const oldTab = activeTab;
     setActiveTab(newTab);
-    trackTabSwitch(oldTab, newTab);
   };
 
   // Calculator options
@@ -127,8 +114,8 @@ export default function HomePage() {
   const [profileType, setProfileType] = useState('square'); // square, round, angle
 
   // Unit conversion options (must be declared before useEffect)
-  const [widthUnit, setWidthUnit] = useState('cm');
-  const [heightUnit, setHeightUnit] = useState('cm');
+  const [widthUnit, setWidthUnit] = useState('ft');
+  const [heightUnit, setHeightUnit] = useState('ft');
 
   // Rod count state for window grills
   const [verticalRods, setVerticalRods] = useState(3);
@@ -213,6 +200,7 @@ export default function HomePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState(null);
+  const [submitError, setSubmitError] = useState(null);
   const [includeCalculatorData, setIncludeCalculatorData] = useState(false);
 
   // Quote notification state
@@ -220,11 +208,11 @@ export default function HomePage() {
 
   // Linear meters of profile needed per square meter of grill area (based on design complexity)
   const linearMetersPerSqMeter = {
-    window: 6,          // 6 m/m² - Simple window grills with basic grid pattern
-    security: 10,       // 10 m/m² - Security grills with closer spacing and reinforcement
-    decorative: 8,      // 8 m/m² - Decorative grills with artistic patterns
-    balcony: 7,         // 7 m/m² - Balcony railings with posts and horizontal rails
-    gate: 12,           // 12 m/m² - Gates with frame, reinforcement, and locking mechanisms
+    window: 14,         // 14 m/m² - Realistic for 4-5 inch grid Indian safety grills
+    security: 18,       // 18 m/m² - Security grills with closer 3-inch spacing
+    decorative: 12,     // 12 m/m² - Decorative grills with artistic patterns
+    balcony: 10,        // 10 m/m² - Balcony railings with posts and horizontal rails
+    gate: 16,           // 16 m/m² - Gates with frame, reinforcement, and locking mechanisms
     staircase: 9        // 9 m/m² - Staircase railings with vertical supports and handrails
   };
 
@@ -252,11 +240,11 @@ export default function HomePage() {
 
   // Standard bar weights (kg per foot) for common sizes used in fabrication
   const barWeightPerFoot = {
-    '8mm': { round: 0.39, square: 0.50 },
-    '10mm': { round: 0.62, square: 0.79 },
-    '12mm': { round: 0.89, square: 1.13 },
-    '16mm': { round: 1.58, square: 2.01 },
-    '20mm': { round: 2.47, square: 3.14 }
+    '8mm': { round: 0.12, square: 0.15 },
+    '10mm': { round: 0.19, square: 0.24 },
+    '12mm': { round: 0.27, square: 0.34 },
+    '16mm': { round: 0.48, square: 0.61 },
+    '20mm': { round: 0.75, square: 0.96 }
   };
 
   // Weight per meter for different profile types and metals (kg/m)
@@ -409,18 +397,26 @@ export default function HomePage() {
       const grillAreaSqFt = widthInFeet * heightInFeet;
       const grillAreaSqMeters = grillAreaSqFt * 0.092903; // Convert to sq meters for display
 
-      // Step 2: Calculate number of bars and total length
+      // Step 2: Calculate number of bars and total length (Both Vertical and Horizontal)
       const spacingInches = parseFloat(barSpacing) || designTypeConfig[designType].barSpacingDefault;
       const widthInInches = widthInFeet * 12;
-      const numberOfBars = Math.ceil(widthInInches / spacingInches);
-      const totalBarLength = numberOfBars * heightInFeet; // vertical bars only for now
+      const heightInInches = heightInFeet * 12;
+      
+      const numberOfVerticalBars = Math.ceil(widthInInches / spacingInches) + 1;
+      const totalVerticalLength = numberOfVerticalBars * heightInFeet;
+      
+      const numberOfHorizontalBars = Math.ceil(heightInInches / spacingInches) + 1;
+      const totalHorizontalLength = numberOfHorizontalBars * widthInFeet;
+
+      const numberOfBars = numberOfVerticalBars + numberOfHorizontalBars;
+      const totalBarLength = totalVerticalLength + totalHorizontalLength;
 
       // Step 3: Apply design complexity factor
       const complexityFactor = designTypeConfig[designType].complexityFactor;
       const adjustedBarLength = totalBarLength * complexityFactor;
 
       // Step 4: Calculate weight with wastage
-      const baseWeightPerFoot = barWeightPerFoot['12mm']?.[profileType === 'square' ? 'square' : 'round'] || 0.89;
+      const baseWeightPerFoot = barWeightPerFoot['12mm']?.[profileType === 'square' ? 'square' : 'round'] || 0.27;
       const baseWeight = adjustedBarLength * baseWeightPerFoot;
       const wastage = parseFloat(wastagePercent) || 7;
       const wastageWeight = baseWeight * (wastage / 100);
@@ -494,32 +490,7 @@ export default function HomePage() {
 
   const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters } = calculateResults();
 
-  // Track calculator usage when values change
-  useEffect(() => {
-    if (width > 0 && height > 0 && weight > 0) {
-      trackCalculatorUsage({
-        calculatorType: showAdvancedCalculator ? 'advanced' : 'standard',
-        grillType,
-        metalType,
-        profileType,
-        dimensions: {
-          width,
-          height,
-          widthUnit: widthUnit,
-          heightUnit: heightUnit
-        },
-        estimatedWeight: weight,
-        estimatedCost: cost
-      });
-    }
-  }, [width, height, grillType, metalType, profileType, weight, cost, showAdvancedCalculator, widthUnit, heightUnit]);
 
-  // Track contact form view when contact tab is active
-  useEffect(() => {
-    if (activeTab === 'contact') {
-      trackContactFormInteraction('form_view');
-    }
-  }, [activeTab]);
 
   // Handle contact form input changes
   const handleContactInputChange = (e) => {
@@ -535,11 +506,35 @@ export default function HomePage() {
     e.preventDefault();
     setIsSubmitting(true);
     setSubmitStatus(null);
+    setSubmitError(null);
+
+    // Frontend Validation
+    if (!contactForm.name || contactForm.name.length < 2) {
+      setSubmitError('Name must be at least 2 characters long.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!contactForm.phone || !/^[\+]?[1-9][\d]{0,15}$/.test(contactForm.phone)) {
+      setSubmitError('Please enter a valid phone number.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!contactForm.subject || contactForm.subject.length < 2) {
+      setSubmitError('Subject must be at least 2 characters long.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!contactForm.message || contactForm.message.length < 2) {
+      setSubmitError('Message must be at least 2 characters long.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
-      // Track form submission attempt
-      await trackContactFormInteraction('form_submit', contactForm);
-
       // Prepare calculator data if available and user wants to include it
       const calculatorData = (includeCalculatorData && width > 0 && height > 0) ? {
         dimensions: {
@@ -1643,7 +1638,7 @@ export default function HomePage() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <p className="text-danger-800 font-medium">
-                              Sorry, there was an error sending your message. Please try again or call us directly.
+                              {submitError || "Sorry, there was an error sending your message. Please try again or call us directly."}
                             </p>
                           </div>
                         </motion.div>
@@ -1704,11 +1699,13 @@ export default function HomePage() {
                               className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
                             >
                               <option value="">Select Project Type</option>
-                              <option value="railing">Railings</option>
+                              <option value="window_grill">Window Grills</option>
+                              <option value="security_grill">Security Grills</option>
+                              <option value="decorative_grill">Decorative Grills</option>
+                              <option value="balcony_grill">Balcony Railings</option>
                               <option value="gate">Gates</option>
-                              <option value="grill">Window Grills</option>
-                              <option value="shed">Sheds</option>
                               <option value="staircase">Staircases</option>
+                              <option value="custom">Custom Design</option>
                               <option value="other">Other</option>
                             </select>
                           </div>

@@ -12,9 +12,7 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [dashboardData, setDashboardData] = useState({
-    totalVisits: 245,
     totalContacts: 38,
-    conversionRate: 15.5,
     recentContacts: [
       {
         id: 1,
@@ -79,7 +77,7 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+      const response = await fetch(`${API_BASE_URL}/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -114,14 +112,14 @@ export default function AdminDashboard() {
     const token = localStorage.getItem('admin_token');
 
     // Load dashboard stats
-    const dashboardResponse = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
+    const dashboardResponse = await fetch(`${API_BASE_URL}/admin/dashboard`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
 
     // Load contact submissions
-    const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`);
+    const contactsResponse = await fetch(`${API_BASE_URL}/contact/submissions`);
 
     const dashboardData = await dashboardResponse.json();
     const contactsData = await contactsResponse.json();
@@ -153,11 +151,8 @@ export default function AdminDashboard() {
   } catch (error) {
     console.error('Dashboard API error:', error);
     setError('Dashboard API not available - using demo mode');
-    // Set demo data for development
     setDashboardData({
-      totalVisits: 0,
       totalContacts: 0,
-      conversionRate: 0,
       recentContacts: []
     });
   } finally {
@@ -170,7 +165,7 @@ export default function AdminDashboard() {
     console.log('Loading contacts from API...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/contact/submissions`);
+      const response = await fetch(`${API_BASE_URL}/contact/submissions`);
       const data = await response.json();
 
       if (data.success && data.data.submissions) {
@@ -199,7 +194,7 @@ export default function AdminDashboard() {
   const updateContactStatus = async (contactId, status) => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -221,7 +216,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/note`, {
+      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/note`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -242,7 +237,7 @@ export default function AdminDashboard() {
   const exportContacts = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/api/admin/export/contacts`, {
+      const response = await fetch(`${API_BASE_URL}/admin/export/contacts`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -373,16 +368,6 @@ export default function AdminDashboard() {
             📋 Contacts
           </Button>
           <Button
-            variant={activeView === 'analytics' ? 'default' : 'outline'}
-            onClick={() => {
-              setActiveView('analytics');
-              loadDashboardData(); // Refresh data when switching to analytics
-            }}
-            className="flex items-center gap-2"
-          >
-            📈 Analytics
-          </Button>
-          <Button
             variant="outline"
             onClick={() => {
               loadDashboardData();
@@ -422,32 +407,10 @@ export default function AdminDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-steel-600">Total Visits</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.totalVisits}</p>
-                    </div>
-                    <div className="text-blue-600">👥</div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
                       <p className="text-sm font-medium text-steel-600">Total Contacts</p>
                       <p className="text-3xl font-bold text-steel-900">{dashboardData.totalContacts}</p>
                     </div>
                     <div className="text-green-600">📧</div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-steel-600">Conversion Rate</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.conversionRate}%</p>
-                    </div>
-                    <div className="text-purple-600">📈</div>
                   </div>
                 </CardContent>
               </Card>
@@ -686,52 +649,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Analytics View */}
-        {activeView === 'analytics' && dashboardData && (
-          <div className="space-y-6">
-            <Card>
-              <CardContent className="p-6">
-                <CardTitle className="mb-4">Analytics Overview</CardTitle>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="font-medium mb-2">Conversion Funnel</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Total Visits</span>
-                        <span>{dashboardData.totalVisits}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Contacts</span>
-                        <span>{dashboardData.totalContacts}</span>
-                      </div>
-                      <div className="flex justify-between font-medium">
-                        <span>Conversion Rate</span>
-                        <span>{dashboardData.conversionRate}%</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div>
-                    <h3 className="font-medium mb-2">Performance Metrics</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Avg. Response Time</span>
-                        <span>2.5 hours</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Customer Satisfaction</span>
-                        <span>4.8/5</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Project Completion</span>
-                        <span>95%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
       </div>
     </div>
   );

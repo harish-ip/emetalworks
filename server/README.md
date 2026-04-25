@@ -1,13 +1,11 @@
 # eMetalWorks Backend Server
 
-MongoDB backend system for user tracking, contact management, and analytics for the eMetalWorks website.
+MongoDB backend system for contact management for the eMetalWorks website.
 
 ## Features
 
-- **User Visit Tracking**: Track page visits, user interactions, device information, and session data
 - **Contact Form Management**: Handle contact form submissions with calculator data integration
-- **Admin Dashboard**: Authentication and analytics dashboard for business insights
-- **Analytics & Reporting**: Comprehensive analytics with conversion tracking and user behavior insights
+- **Admin Dashboard**: Authentication and dashboard for business insights
 - **Security**: Rate limiting, CORS protection, input validation, and JWT authentication
 
 ## Tech Stack
@@ -92,19 +90,13 @@ MongoDB backend system for user tracking, contact management, and analytics for 
 
 ## API Endpoints
 
-### User Tracking
-- `POST /api/tracking/visit` - Track page visits
-- `POST /api/tracking/interaction` - Track user interactions
-- `PUT /api/tracking/visit/:sessionId/duration` - Update visit duration
-- `GET /api/tracking/analytics` - Get visit analytics
-
 ### Contact Management
 - `POST /api/contact/submit` - Submit contact form
 - `GET /api/contact/submissions` - Get all submissions (admin)
 - `GET /api/contact/submission/:id` - Get specific submission
 - `PUT /api/contact/submission/:id/status` - Update submission status
 - `POST /api/contact/submission/:id/note` - Add admin note
-- `GET /api/contact/analytics` - Get contact analytics
+
 
 ### Admin
 - `POST /api/admin/login` - Admin authentication
@@ -113,26 +105,6 @@ MongoDB backend system for user tracking, contact management, and analytics for 
 - `GET /api/admin/export/contacts` - Export contact data
 
 ## Database Schema
-
-### UserVisit Collection
-```javascript
-{
-  sessionId: String,        // Unique session identifier
-  visitorId: String,        // Unique visitor identifier
-  visitDate: Date,          // Visit timestamp
-  currentPage: String,      // Page visited
-  referrer: String,         // Referrer URL
-  userAgent: String,        // Browser user agent
-  ipAddress: String,        // Visitor IP address
-  device: String,           // Device type (mobile/tablet/desktop)
-  browser: Object,          // Browser information
-  location: Object,         // Geographic location
-  timeOnSite: Number,       // Time spent on site (seconds)
-  interactions: Array,      // User interactions
-  calculatorUsed: Boolean,  // Whether calculator was used
-  contactFormViewed: Boolean // Whether contact form was viewed
-}
-```
 
 ### ContactSubmission Collection
 ```javascript

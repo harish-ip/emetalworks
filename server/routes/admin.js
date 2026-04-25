@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const UserVisit = require('../models/UserVisit');
 const ContactSubmission = require('../models/ContactSubmission');
 
 // Simple admin authentication middleware
@@ -102,139 +101,16 @@ router.get('/dashboard', authenticateAdmin, async (req, res) => {
         startDate.setDate(startDate.getDate() - 7);
     }
     
-    // Get visit analytics
-    const visitAnalytics = await UserVisit.getAnalytics(startDate.toISOString());
-    
-    // Get contact analytics
-    const contactAnalytics = await ContactSubmission.getContactAnalytics(startDate.toISOString());
-    
-    // Get recent activities
-    const recentVisits = await UserVisit.find({ visitDate: { $gte: startDate } })
-      .sort({ visitDate: -1 })
-      .limit(10)
-      .select('visitDate currentPage device browser.name calculatorUsed contactFormViewed timeOnSite');
-    
     const recentContacts = await ContactSubmission.find({ submissionDate: { $gte: startDate } })
       .sort({ submissionDate: -1 })
       .limit(10)
       .select('name email subject status submissionDate source priority');
     
-    // Get top pages
-    const topPages = await UserVisit.aggregate([
-      { $match: { visitDate: { $gte: startDate } } },
-      {
-        $group: {
-          _id: '$currentPage',
-          visits: { $sum: 1 },
-          avgTimeOnSite: { $avg: '$timeOnSite' },
-          uniqueVisitors: { $addToSet: '$visitorId' }
-        }
-      },
-      {
-        $project: {
-          page: '$_id',
-          visits: 1,
-          avgTimeOnSite: { $round: ['$avgTimeOnSite', 2] },
-          uniqueVisitors: { $size: '$uniqueVisitors' },
-          _id: 0
-        }
-      },
-      { $sort: { visits: -1 } },
-      { $limit: 5 }
-    ]);
-    
-    // Get conversion funnel
-    const totalVisits = await UserVisit.countDocuments({ visitDate: { $gte: startDate } });
-    const calculatorUsers = await UserVisit.countDocuments({ 
-      visitDate: { $gte: startDate },
-      calculatorUsed: true 
-    });
-    const contactFormViews = await UserVisit.countDocuments({ 
-      visitDate: { $gte: startDate },
-      contactFormViewed: true 
-    });
-    const contactSubmissions = await ContactSubmission.countDocuments({ 
-      submissionDate: { $gte: startDate } 
-    });
-    
-    const conversionFunnel = {
-      visits: totalVisits,
-      calculatorUsers,
-      contactFormViews,
-      contactSubmissions,
-      calculatorConversionRate: totalVisits > 0 ? ((calculatorUsers / totalVisits) * 100).toFixed(2) : 0,
-      contactViewRate: totalVisits > 0 ? ((contactFormViews / totalVisits) * 100).toFixed(2) : 0,
-      submissionRate: contactFormViews > 0 ? ((contactSubmissions / contactFormViews) * 100).toFixed(2) : 0
-    };
-    
-    // Get device and browser stats
-    const deviceStats = await UserVisit.aggregate([
-      { $match: { visitDate: { $gte: startDate } } },
-      {
-        $group: {
-          _id: '$device',
-          count: { $sum: 1 },
-          avgTimeOnSite: { $avg: '$timeOnSite' }
-        }
-      },
-      { $sort: { count: -1 } }
-    ]);
-    
-    const browserStats = await UserVisit.aggregate([
-      { $match: { visitDate: { $gte: startDate } } },
-      {
-        $group: {
-          _id: '$browser.name',
-          count: { $sum: 1 }
-        }
-      },
-      { $sort: { count: -1 } },
-      { $limit: 5 }
-    ]);
-    
-    // Get daily trends
-    const dailyTrends = await UserVisit.aggregate([
-      { $match: { visitDate: { $gte: startDate } } },
-      {
-        $group: {
-          _id: {
-            $dateToString: {
-              format: '%Y-%m-%d',
-              date: '$visitDate'
-            }
-          },
-          visits: { $sum: 1 },
-          uniqueVisitors: { $addToSet: '$visitorId' },
-          calculatorUsers: { $sum: { $cond: ['$calculatorUsed', 1, 0] } },
-          avgTimeOnSite: { $avg: '$timeOnSite' }
-        }
-      },
-      {
-        $project: {
-          date: '$_id',
-          visits: 1,
-          uniqueVisitors: { $size: '$uniqueVisitors' },
-          calculatorUsers: 1,
-          avgTimeOnSite: { $round: ['$avgTimeOnSite', 2] },
-          _id: 0
-        }
-      },
-      { $sort: { date: 1 } }
-    ]);
-    
     res.json({
       success: true,
       data: {
         period,
-        visitAnalytics: visitAnalytics[0] || {},
-        contactAnalytics: contactAnalytics[0] || {},
-        recentVisits,
-        recentContacts,
-        topPages,
-        conversionFunnel,
-        deviceStats,
-        browserStats,
-        dailyTrends
+        recentContacts
       }
     });
     
@@ -307,23 +183,17 @@ router.get('/stats', authenticateAdmin, async (req, res) => {
     
     const stats = {
       today: {
-        visits: await UserVisit.countDocuments({ visitDate: { $gte: today } }),
         contacts: await ContactSubmission.countDocuments({ submissionDate: { $gte: today } })
       },
       yesterday: {
-        visits: await UserVisit.countDocuments({ 
-          visitDate: { $gte: yesterday, $lt: today } 
-        }),
         contacts: await ContactSubmission.countDocuments({ 
           submissionDate: { $gte: yesterday, $lt: today } 
         })
       },
       thisWeek: {
-        visits: await UserVisit.countDocuments({ visitDate: { $gte: thisWeek } }),
         contacts: await ContactSubmission.countDocuments({ submissionDate: { $gte: thisWeek } })
       },
       total: {
-        visits: await UserVisit.countDocuments(),
         contacts: await ContactSubmission.countDocuments(),
         newContacts: await ContactSubmission.countDocuments({ status: 'new' }),
         convertedContacts: await ContactSubmission.countDocuments({ status: 'converted' })

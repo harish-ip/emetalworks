@@ -10,7 +10,6 @@ console.log('🚀 Starting eMetalWorks Backend Server...');
 const app = express();
 
 // Import routes
-const userTrackingRoutes = require('./routes/userTracking');
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin');
 
@@ -63,7 +62,7 @@ console.log('📊 Connecting to MongoDB...');
 connectDB();
 
 // Routes
-app.use('/api/tracking', userTrackingRoutes);
+
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 
