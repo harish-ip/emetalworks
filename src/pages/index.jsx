@@ -515,8 +515,14 @@ export default function HomePage() {
       setIsSubmitting(false);
       return;
     }
-    if (!contactForm.phone || !/^[\+]?[1-9][\d]{0,15}$/.test(contactForm.phone)) {
-      setSubmitError('Please enter a valid phone number.');
+    if (!contactForm.phone || !/^[\+]?[1-9][\d]{9,14}$/.test(contactForm.phone)) {
+      setSubmitError('Please enter a valid 10-digit mobile number (e.g. 9876543210).');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!contactForm.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.email)) {
+      setSubmitError('Please enter a valid email address (e.g. name@gmail.com).');
       setSubmitStatus('error');
       setIsSubmitting(false);
       return;
@@ -529,6 +535,12 @@ export default function HomePage() {
     }
     if (!contactForm.message || contactForm.message.length < 2) {
       setSubmitError('Message must be at least 2 characters long.');
+      setSubmitStatus('error');
+      setIsSubmitting(false);
+      return;
+    }
+    if (!contactForm.projectType) {
+      setSubmitError('Please select a Project Type before submitting.');
       setSubmitStatus('error');
       setIsSubmitting(false);
       return;
