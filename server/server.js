@@ -66,13 +66,16 @@ connectDB();
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 
-// Health check endpoint
+// Health check endpoint (used by UptimeRobot to keep service alive)
 app.get('/api/health', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  const dbStatus = ['disconnected', 'connected', 'connecting', 'disconnecting'][dbState] || 'unknown';
   res.json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    uptime: Math.round(process.uptime()) + 's',
+    environment: process.env.NODE_ENV || 'development',
+    database: dbStatus
   });
 });
 
