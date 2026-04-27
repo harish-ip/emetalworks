@@ -8,7 +8,7 @@ const contactSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   email: Joi.string().email().required(),
   phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
-  subject: Joi.string().trim().min(2).max(200).required(),
+  subject: Joi.string().trim().min(2).max(200).allow('').optional(),
   message: Joi.string().trim().min(2).max(2000).required(),
   projectType: Joi.string().valid('window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'gate', 'staircase', 'custom', 'other').allow('').optional(),
   projectBudget: Joi.string().valid('under_10k', '10k_25k', '25k_50k', '50k_100k', 'above_100k', 'not_specified').allow('').optional(),

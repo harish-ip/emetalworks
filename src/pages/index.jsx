@@ -527,12 +527,6 @@ export default function HomePage() {
       setIsSubmitting(false);
       return;
     }
-    if (!contactForm.subject || contactForm.subject.length < 2) {
-      setSubmitError('Subject must be at least 2 characters long.');
-      setSubmitStatus('error');
-      setIsSubmitting(false);
-      return;
-    }
     if (!contactForm.message || contactForm.message.length < 2) {
       setSubmitError('Message must be at least 2 characters long.');
       setSubmitStatus('error');
