@@ -3,13 +3,35 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="eMetalWorks - Premium custom steel grills, railings, sheds, and gates in Hyderabad. Expert fabrication services by Bhavya Fabrication Works with quality guaranteed." />
-    <meta name="keywords" content="eMetalWorks, steel fabrication, railings, grills, gates, sheds, Hyderabad, custom steel work, Bhavya Fabrication" />
-    <title>eMetalWorks - Premium Steel Fabrication Calculator & Services</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="eMetalWorks - Get instant price for steel grills, railings, gates & sheds in Hyderabad. Free calculator + expert fabrication by Bhavya Fabrication Works." />
+    <meta name="keywords" content="steel grills Hyderabad, window grills price, balcony railings, steel gates, fabrication calculator" />
+    <title>eMetalWorks - Steel Grill Price Calculator Hyderabad</title>
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#1e40af" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS PWA -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="eMetalWorks" />
+
+    <!-- Open Graph (WhatsApp share preview) -->
+    <meta property="og:title" content="eMetalWorks - Steel Grill Calculator Hyderabad" />
+    <meta property="og:description" content="Get instant price estimate for window grills, balcony railings, gates & more. Starting from ₹3,000." />
+    <meta property="og:type" content="website" />
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
