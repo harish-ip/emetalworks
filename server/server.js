@@ -33,6 +33,9 @@ const allowedOrigins = [
   'http://localhost:3001',
   'http://localhost:3002',
   'http://localhost:5173',
+  // Local network (mobile testing on same WiFi)
+  'http://192.168.29.203:3000',
+  'http://192.168.208.1:3000',
 ].filter(Boolean);
 
 const corsOptions = {

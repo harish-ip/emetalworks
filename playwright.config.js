@@ -8,18 +8,22 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost',
+    baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     headless: true,
   },
   projects: [
     {
-      name: 'chromium',
+      name: 'Desktop Chrome',
       use: { ...devices['Desktop Chrome'] },
     },
     {
-      name: 'Mobile Chrome',
+      name: 'Mobile Chrome (Pixel 5)',
       use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile Chrome (Galaxy S21)',
+      use: { ...devices['Galaxy S9+'] },
     },
   ],
 });
