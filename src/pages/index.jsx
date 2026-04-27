@@ -167,22 +167,37 @@ export default function HomePage() {
   // Function to navigate to calculator with pre-selected grill type
   const goToCalculator = (serviceType = null) => {
     if (serviceType) {
-      // Map service types to grill types
+      // Map service titles to grill types (for calculator)
       const serviceToGrillMap = {
         'Balcony Railings': 'balcony',
         'Window Grills': 'window',
         'Steel Gates': 'gate',
         'Staircase Railings': 'staircase',
         'Custom Fabrication': 'decorative',
-        'Sheds': 'window' // Default to window for sheds
+        'Sheds': 'window'
+      };
+
+      // Map service titles to projectType values (for contact form)
+      const serviceToProjectTypeMap = {
+        'Balcony Railings': 'balcony_grill',
+        'Window Grills': 'window_grill',
+        'Steel Gates': 'gate',
+        'Staircase Railings': 'staircase',
+        'Custom Fabrication': 'custom',
+        'Sheds': 'custom'
       };
 
       const mappedGrillType = serviceToGrillMap[serviceType];
       if (mappedGrillType) {
         setGrillType(mappedGrillType);
-        // Show notification
         setQuoteNotification(`${serviceType} selected in calculator!`);
         setTimeout(() => setQuoteNotification(null), 3000);
+      }
+
+      // Pre-fill projectType in contact form
+      const mappedProjectType = serviceToProjectTypeMap[serviceType];
+      if (mappedProjectType) {
+        setContactForm(prev => ({ ...prev, projectType: mappedProjectType }));
       }
     }
     handleTabSwitch('calculator');
