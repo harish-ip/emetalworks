@@ -45,18 +45,17 @@ test.describe('Desktop Chrome — Layout & Navigation', () => {
     await page.goto('/');
     await page.fill('input[placeholder="Enter width"]', '4');
     await page.fill('input[placeholder="Enter height"]', '5');
-    await expect(page.locator('text=Project Summary').first()).toBeVisible({ timeout: 10000 });
-    // 'Estimated Weight' label is a child div in the results card
-    await expect(page.locator('text=Estimated Weight').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Estimated Cost').first()).toBeVisible({ timeout: 5000 });
+    // Order Summary panel appears with weight and cost
+    await expect(page.locator('text=Order Summary').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Est. Weight').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Total Estimate').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should show Get a Quote CTA button after calculation', async ({ page }) => {
     await page.goto('/');
     await page.fill('input[placeholder="Enter width"]', '4');
     await page.fill('input[placeholder="Enter height"]', '5');
-    await expect(page.locator('text=Project Summary').first()).toBeVisible({ timeout: 10000 });
-    // Button is labelled 'Get Detailed Quote' in the results panel
+    await expect(page.locator('text=Order Summary').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('button:has-text("Get Detailed Quote")').first()).toBeVisible({ timeout: 5000 });
   });
 });
@@ -69,6 +68,13 @@ test.describe('Mobile Chrome — Layout & Navigation', () => {
   test('should open on calculator screen on mobile', async ({ page }) => {
     await page.goto('/');
     await expect(page.locator('text=eMetalWorks Calculator')).toBeVisible({ timeout: 8000 });
+  });
+
+  test('should show sticky mobile header', async ({ page }) => {
+    await page.goto('/');
+    const header = page.locator('header.md\\:hidden');
+    await expect(header).toBeVisible();
+    await expect(header.locator('text=eMetalWorks')).toBeVisible();
   });
 
   test('should show bottom navigation bar on mobile', async ({ page }) => {
@@ -109,9 +115,8 @@ test.describe('Mobile Chrome — Layout & Navigation', () => {
     await page.goto('/');
     await page.fill('input[placeholder="Enter width"]', '3');
     await page.fill('input[placeholder="Enter height"]', '4');
-    await expect(page.locator('text=Project Summary').first()).toBeVisible({ timeout: 10000 });
-    await expect(page.locator('text=Estimated Weight').first()).toBeVisible({ timeout: 5000 });
-    await expect(page.locator('text=Estimated Cost').first()).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Order Summary').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('text=Est. Weight').first()).toBeVisible({ timeout: 5000 });
   });
 
   test('should have touch-friendly bottom nav buttons (min 44px height)', async ({ page }) => {
