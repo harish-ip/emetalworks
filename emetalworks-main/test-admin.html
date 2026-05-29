@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Test</title>
+</head>
+<body>
+    <h1>Admin Dashboard Test</h1>
+    <div id="status">Testing...</div>
+    
+    <script>
+        // Test if admin component loads
+        console.log('Testing admin dashboard access...');
+        
+        // Test API connection
+        fetch('http://localhost:5004/api/admin/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: 'admin',
+                password: 'admin123'
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('API Response:', data);
+            document.getElementById('status').innerHTML = 'API Connection: ' + (data.success ? 'SUCCESS' : 'FAILED');
+        })
+        .catch(error => {
+            console.error('API Error:', error);
+            document.getElementById('status').innerHTML = 'API Connection: ERROR - ' + error.message;
+        });
+    </script>
+</body>
+</html>

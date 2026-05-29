@@ -1,0 +1,11 @@
+
+> emetalworks-backend@1.0.0 start
+> node server.js
+
+🚀 Starting eMetalWorks Backend Server...
+📊 Connecting to MongoDB...
+🚀 Server running on port 5001
+📊 Environment: development
+🌐 Allowed frontend origins: http://localhost:3000, http://localhost:3002, http://localhost:5173, http://localhost:5174, http://127.0.0.1:3000, http://127.0.0.1:3002, http://127.0.0.1:5173, http://127.0.0.1:5174
+✅ MongoDB Connected: localhost
+📧 New contact submission from Quote Space Phone (quote-space@example.com)
