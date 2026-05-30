@@ -19,13 +19,13 @@ const contactSubmissionSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Phone number is required'],
     trim: true,
-    match: [/^[\+]?[1-9][\d]{0,15}$/, 'Please enter a valid phone number']
+    match: [/^[\+]?[0-9][0-9\s-]{7,20}$/, 'Please enter a valid phone number']
   },
   
   // Message details
   subject: {
     type: String,
-    required: false,
+    required: [true, 'Subject is required'],
     trim: true,
     maxlength: [200, 'Subject cannot exceed 200 characters']
   },
@@ -39,7 +39,7 @@ const contactSubmissionSchema = new mongoose.Schema({
   // Project details (if provided)
   projectType: {
     type: String,
-    enum: ['window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'gate', 'staircase', 'custom', 'other'],
+    enum: ['window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'railing', 'gate', 'grill', 'shed', 'staircase', 'custom', 'other'],
     default: 'other'
   },
   projectBudget: {
@@ -64,25 +64,26 @@ const contactSubmissionSchema = new mongoose.Schema({
     grillType: String,
     metalType: String,
     profileType: String,
+	  quantity: Number,
     estimatedWeight: Number,
     estimatedCost: Number,
     calculatorType: {
       type: String,
       enum: ['standard', 'advanced', 'rod_based']
-    },
-    rodCalculation: mongoose.Schema.Types.Mixed,
-    designType: String,
-    barSpacing: Number,
-    wastagePercent: Number,
-    laborRate: Number,
-    customLinearFactor: Number,
-    customProfileWeight: Number,
-    customProfileSize: String,
-    materialCost: Number,
-    laborCost: Number,
-    totalLinearMeters: Number
+    }
   },
   
+  // Tracking information
+  sessionId: {
+    type: String,
+    required: true,
+    index: true
+  },
+  visitorId: {
+    type: String,
+    required: true,
+    index: true
+  },
   
   // Submission metadata
   submissionDate: {
@@ -208,5 +209,56 @@ contactSubmissionSchema.methods.updateStatus = function(newStatus, updatedBy) {
   return this.save();
 };
 
+// Static method to get contact analytics
+contactSubmissionSchema.statics.getContactAnalytics = function(startDate, endDate) {
+  const matchStage = {};
+  if (startDate || endDate) {
+    matchStage.submissionDate = {};
+    if (startDate) matchStage.submissionDate.$gte = new Date(startDate);
+    if (endDate) matchStage.submissionDate.$lte = new Date(endDate);
+  }
+  
+  return this.aggregate([
+    { $match: matchStage },
+    {
+      $group: {
+        _id: null,
+        totalSubmissions: { $sum: 1 },
+        newContacts: { $sum: { $cond: [{ $eq: ['$status', 'new'] }, 1, 0] } },
+        contactedLeads: { $sum: { $cond: [{ $eq: ['$status', 'contacted'] }, 1, 0] } },
+        quotedLeads: { $sum: { $cond: [{ $eq: ['$status', 'quoted'] }, 1, 0] } },
+        convertedLeads: { $sum: { $cond: [{ $eq: ['$status', 'converted'] }, 1, 0] } },
+        totalConversionValue: { $sum: '$conversionValue' },
+        avgConversionValue: { $avg: '$conversionValue' },
+        calculatorSubmissions: { $sum: { $cond: [{ $eq: ['$source', 'calculator_quote'] }, 1, 0] } }
+      }
+    },
+    {
+      $project: {
+        _id: 0,
+        totalSubmissions: 1,
+        newContacts: 1,
+        contactedLeads: 1,
+        quotedLeads: 1,
+        convertedLeads: 1,
+        conversionRate: { 
+          $multiply: [
+            { $divide: ['$convertedLeads', '$totalSubmissions'] }, 
+            100
+          ] 
+        },
+        totalConversionValue: { $round: ['$totalConversionValue', 2] },
+        avgConversionValue: { $round: ['$avgConversionValue', 2] },
+        calculatorSubmissions: 1,
+        calculatorConversionRate: {
+          $multiply: [
+            { $divide: ['$calculatorSubmissions', '$totalSubmissions'] },
+            100
+          ]
+        }
+      }
+    }
+  ]);
+};
 
 module.exports = mongoose.model('ContactSubmission', contactSubmissionSchema);

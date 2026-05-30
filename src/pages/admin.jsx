@@ -5,14 +5,56 @@ import { Card, CardContent, CardTitle } from '../components/ui/card.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5007';
+const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_BASE_URL = RAW_API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+
+const QUOTE_CONFIG = {
+  materialRates: {
+    steel: 68,
+    stainless: 275
+  },
+  fabricationRates: {
+    steel: 105,
+    stainless: 160
+  },
+  finishingRates: {
+    steel: 45,
+    stainless: 20
+  },
+  installationRates: {
+    window: 55,
+    security: 70,
+    decorative: 85,
+    balcony: 95,
+    gate: 120,
+    staircase: 120
+  },
+  complexity: {
+    window: 1,
+    security: 1.3,
+    decorative: 1.5,
+    balcony: 1.2,
+    gate: 1.4,
+    staircase: 1.6
+  },
+  profileWeights: {
+    rod_8mm: 0.39,
+    rod_10mm: 0.62,
+    rod_12mm: 0.89,
+    square: 1.15,
+    round: 0.89,
+    angle: 1.12
+  }
+};
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [dashboardData, setDashboardData] = useState({
+    totalVisits: 245,
     totalContacts: 38,
+    conversionRate: 15.5,
     recentContacts: [
       {
         id: 1,
@@ -54,6 +96,80 @@ export default function AdminDashboard() {
   const [adminNote, setAdminNote] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [quoteForm, setQuoteForm] = useState({
+    workType: 'window',
+    material: 'steel',
+    width: '4',
+    height: '4',
+    quantity: '1',
+    profile: 'rod_10mm',
+    spacing: '4',
+    wastage: '7',
+    finishingRate: '45',
+    installRate: '55',
+    extraCost: '0',
+    minimumCharge: '2500'
+  });
+
+  const calculateAdminQuote = () => {
+    const width = parseFloat(quoteForm.width) || 0;
+    const height = parseFloat(quoteForm.height) || 0;
+    const quantity = parseInt(quoteForm.quantity, 10) || 1;
+    const areaSqFt = width * height * quantity;
+    const profileWeight = QUOTE_CONFIG.profileWeights[quoteForm.profile] || 1.15;
+    const materialRate = QUOTE_CONFIG.materialRates[quoteForm.material] || 68;
+    const fabricationRate = QUOTE_CONFIG.fabricationRates[quoteForm.material] || 105;
+    const complexity = QUOTE_CONFIG.complexity[quoteForm.workType] || 1;
+    const wastagePercent = parseFloat(quoteForm.wastage) || 0;
+    const finishingRate = parseFloat(quoteForm.finishingRate) || 0;
+    const installRate = parseFloat(quoteForm.installRate) || 0;
+    const extraCost = parseFloat(quoteForm.extraCost) || 0;
+    const minimumCharge = parseFloat(quoteForm.minimumCharge) || 0;
+
+    let linearMeters = 0;
+
+    if (quoteForm.workType === 'window') {
+      const verticalBars = Math.max(2, Math.ceil((width * 12) / (parseFloat(quoteForm.spacing) || 4)));
+      const horizontalBars = Math.max(3, Math.ceil((height * 12) / 12));
+      const rodLengthFt = (verticalBars * height + horizontalBars * width) * quantity;
+      const frameLengthFt = 2 * (width + height) * quantity;
+      linearMeters = (rodLengthFt + frameLengthFt) * 0.3048;
+    } else {
+      const linearFactor = {
+        security: 10,
+        decorative: 8,
+        balcony: 7,
+        gate: 12,
+        staircase: 9
+      }[quoteForm.workType] || 7;
+      linearMeters = areaSqFt * 0.092903 * linearFactor;
+    }
+
+    const baseWeight = linearMeters * profileWeight;
+    const wastageWeight = baseWeight * (wastagePercent / 100);
+    const totalWeight = baseWeight + wastageWeight;
+    const materialCost = totalWeight * materialRate;
+    const fabricationCost = totalWeight * fabricationRate * complexity;
+    const finishingCost = areaSqFt * finishingRate;
+    const installationCost = areaSqFt * installRate;
+    const subtotal = materialCost + fabricationCost + finishingCost + installationCost + extraCost;
+    const total = Math.max(minimumCharge, subtotal);
+
+    return {
+      areaSqFt,
+      linearMeters,
+      totalWeight,
+      materialCost,
+      fabricationCost,
+      finishingCost,
+      installationCost,
+      extraCost,
+      subtotal,
+      total
+    };
+  };
+
+  const adminQuote = calculateAdminQuote();
 
   // Check if already authenticated
   useEffect(() => {
@@ -77,7 +193,7 @@ export default function AdminDashboard() {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/admin/login`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -112,14 +228,14 @@ export default function AdminDashboard() {
     const token = localStorage.getItem('admin_token');
 
     // Load dashboard stats
-    const dashboardResponse = await fetch(`${API_BASE_URL}/admin/dashboard`, {
+    const dashboardResponse = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
       headers: {
         'Authorization': `Bearer ${token}`
       }
     });
 
     // Load contact submissions
-    const contactsResponse = await fetch(`${API_BASE_URL}/contact/submissions`);
+    const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`);
 
     const dashboardData = await dashboardResponse.json();
     const contactsData = await contactsResponse.json();
@@ -151,8 +267,11 @@ export default function AdminDashboard() {
   } catch (error) {
     console.error('Dashboard API error:', error);
     setError('Dashboard API not available - using demo mode');
+    // Set demo data for development
     setDashboardData({
+      totalVisits: 0,
       totalContacts: 0,
+      conversionRate: 0,
       recentContacts: []
     });
   } finally {
@@ -165,7 +284,7 @@ export default function AdminDashboard() {
     console.log('Loading contacts from API...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/contact/submissions`);
+      const response = await fetch(`${API_BASE_URL}/api/contact/submissions`);
       const data = await response.json();
 
       if (data.success && data.data.submissions) {
@@ -194,7 +313,7 @@ export default function AdminDashboard() {
   const updateContactStatus = async (contactId, status) => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -216,7 +335,7 @@ export default function AdminDashboard() {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/contact/submission/${contactId}/note`, {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/note`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -237,7 +356,7 @@ export default function AdminDashboard() {
   const exportContacts = async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/admin/export/contacts`, {
+      const response = await fetch(`${API_BASE_URL}/api/admin/export/contacts`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -368,6 +487,23 @@ export default function AdminDashboard() {
             📋 Contacts
           </Button>
           <Button
+            variant={activeView === 'analytics' ? 'default' : 'outline'}
+            onClick={() => {
+              setActiveView('analytics');
+              loadDashboardData(); // Refresh data when switching to analytics
+            }}
+            className="flex items-center gap-2"
+          >
+            📈 Analytics
+          </Button>
+          <Button
+            variant={activeView === 'quotation' ? 'default' : 'outline'}
+            onClick={() => setActiveView('quotation')}
+            className="flex items-center gap-2"
+          >
+            Quotation Ref
+          </Button>
+          <Button
             variant="outline"
             onClick={() => {
               loadDashboardData();
@@ -407,10 +543,32 @@ export default function AdminDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
+                      <p className="text-sm font-medium text-steel-600">Total Visits</p>
+                      <p className="text-3xl font-bold text-steel-900">{dashboardData.totalVisits}</p>
+                    </div>
+                    <div className="text-blue-600">👥</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
                       <p className="text-sm font-medium text-steel-600">Total Contacts</p>
                       <p className="text-3xl font-bold text-steel-900">{dashboardData.totalContacts}</p>
                     </div>
                     <div className="text-green-600">📧</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-steel-600">Conversion Rate</p>
+                      <p className="text-3xl font-bold text-steel-900">{dashboardData.conversionRate}%</p>
+                    </div>
+                    <div className="text-purple-600">📈</div>
                   </div>
                 </CardContent>
               </Card>
@@ -571,6 +729,12 @@ export default function AdminDashboard() {
                                     {contact.calculatorData.profileType}
                                   </div>
                                 )}
+	                                {contact.calculatorData.quantity && (
+	                                  <div>
+	                                    <span className="font-medium">Quantity: </span>
+	                                    {contact.calculatorData.quantity}
+	                                  </div>
+	                                )}
                                 {contact.calculatorData.estimatedWeight && (
                                   <div>
                                     <span className="font-medium">Weight: </span>
@@ -649,6 +813,212 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Analytics View */}
+        {activeView === 'analytics' && dashboardData && (
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Analytics Overview</CardTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h3 className="font-medium mb-2">Conversion Funnel</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Total Visits</span>
+                        <span>{dashboardData.totalVisits}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Contacts</span>
+                        <span>{dashboardData.totalContacts}</span>
+                      </div>
+                      <div className="flex justify-between font-medium">
+                        <span>Conversion Rate</span>
+                        <span>{dashboardData.conversionRate}%</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="font-medium mb-2">Performance Metrics</h3>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span>Avg. Response Time</span>
+                        <span>2.5 hours</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Customer Satisfaction</span>
+                        <span>4.8/5</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Project Completion</span>
+                        <span>95%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {activeView === 'quotation' && (
+          <div className="space-y-6">
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Advanced Quotation Calculator</CardTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-steel-700 mb-2">Work Type</label>
+                    <select
+                      value={quoteForm.workType}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, workType: e.target.value })}
+                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
+                    >
+                      <option value="window">Window Grills</option>
+                      <option value="security">Security Grills</option>
+                      <option value="decorative">Decorative Grills</option>
+                      <option value="balcony">Balcony Railings</option>
+                      <option value="gate">Gate Grills</option>
+                      <option value="staircase">Staircase Railings</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-steel-700 mb-2">Material</label>
+                    <select
+                      value={quoteForm.material}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, material: e.target.value })}
+                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
+                    >
+                      <option value="steel">Mild Steel</option>
+                      <option value="stainless">Stainless Steel 304</option>
+                    </select>
+                  </div>
+                  <Input label="Width (ft)" type="number" step="0.1" value={quoteForm.width} onChange={(e) => setQuoteForm({ ...quoteForm, width: e.target.value })} />
+                  <Input label="Height (ft)" type="number" step="0.1" value={quoteForm.height} onChange={(e) => setQuoteForm({ ...quoteForm, height: e.target.value })} />
+                  <Input label="Quantity" type="number" min="1" value={quoteForm.quantity} onChange={(e) => setQuoteForm({ ...quoteForm, quantity: e.target.value })} />
+                  <div>
+                    <label className="block text-sm font-medium text-steel-700 mb-2">Profile</label>
+                    <select
+                      value={quoteForm.profile}
+                      onChange={(e) => setQuoteForm({ ...quoteForm, profile: e.target.value })}
+                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
+                    >
+                      <option value="rod_8mm">8mm Round Rod</option>
+                      <option value="rod_10mm">10mm Round Rod</option>
+                      <option value="rod_12mm">12mm Round Rod</option>
+                      <option value="square">20x20x2mm Square Pipe</option>
+                      <option value="round">20mm Round Pipe</option>
+                      <option value="angle">25x25x3mm Angle</option>
+                    </select>
+                  </div>
+                  <Input label="Bar Spacing (in)" type="number" step="0.5" value={quoteForm.spacing} onChange={(e) => setQuoteForm({ ...quoteForm, spacing: e.target.value })} />
+                  <Input label="Wastage (%)" type="number" step="1" value={quoteForm.wastage} onChange={(e) => setQuoteForm({ ...quoteForm, wastage: e.target.value })} />
+                  <Input label="Finish Rate (Rs/sq.ft)" type="number" step="5" value={quoteForm.finishingRate} onChange={(e) => setQuoteForm({ ...quoteForm, finishingRate: e.target.value })} />
+                  <Input label="Install Rate (Rs/sq.ft)" type="number" step="5" value={quoteForm.installRate} onChange={(e) => setQuoteForm({ ...quoteForm, installRate: e.target.value })} />
+                  <Input label="Extra Cost (Rs)" type="number" step="100" value={quoteForm.extraCost} onChange={(e) => setQuoteForm({ ...quoteForm, extraCost: e.target.value })} />
+                  <Input label="Minimum Charge (Rs)" type="number" step="100" value={quoteForm.minimumCharge} onChange={(e) => setQuoteForm({ ...quoteForm, minimumCharge: e.target.value })} />
+                </div>
+
+                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    ['Area', `${adminQuote.areaSqFt.toFixed(1)} sq.ft`],
+                    ['Linear Length', `${adminQuote.linearMeters.toFixed(1)} m`],
+                    ['Weight', `${adminQuote.totalWeight.toFixed(1)} kg`],
+                    ['Final Quote', `Rs ${Math.round(adminQuote.total).toLocaleString('en-IN')}`]
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg bg-steel-900 p-4 text-white">
+                      <p className="text-sm text-steel-300">{label}</p>
+                      <p className="text-2xl font-bold">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
+                  {[
+                    ['Material', adminQuote.materialCost],
+                    ['Fabrication', adminQuote.fabricationCost],
+                    ['Finish', adminQuote.finishingCost],
+                    ['Install', adminQuote.installationCost],
+                    ['Extra', adminQuote.extraCost]
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg border border-steel-200 bg-white p-3">
+                      <p className="text-steel-500">{label}</p>
+                      <p className="font-bold text-steel-900">Rs {Math.round(value).toLocaleString('en-IN')}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Quotation Reference</CardTitle>
+                <p className="text-steel-600 mb-6">
+                  Internal assumptions used by the public calculator. Update against current Hyderabad market rates before giving a final quote.
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[
+                    ['MS material', 'Rs 68/kg'],
+                    ['SS 304 material', 'Rs 275/kg'],
+                    ['MS fabrication', 'Rs 105/kg'],
+                    ['SS fabrication', 'Rs 160/kg'],
+                    ['MS finishing', 'Rs 45/sq.ft'],
+                    ['SS finishing', 'Rs 20/sq.ft'],
+                    ['Wastage', '7%'],
+                    ['Minimum job', 'Rs 2,500']
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-lg border border-steel-200 bg-white p-4">
+                      <p className="text-sm text-steel-500">{label}</p>
+                      <p className="text-xl font-bold text-steel-900">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Default Section Mapping</CardTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+                  {[
+                    ['Window grills', '10mm round rod + angle frame'],
+                    ['Security grills', '12mm round rod'],
+                    ['Decorative grills', '20x20x2mm square pipe'],
+                    ['Balcony railings', '20x20x2mm square pipe'],
+                    ['Gate grills', '25x25x3mm angle'],
+                    ['Staircase railings', '20mm round pipe']
+                  ].map(([work, section]) => (
+                    <div key={work} className="rounded-lg bg-steel-50 p-4">
+                      <p className="font-semibold text-steel-900">{work}</p>
+                      <p className="text-steel-600 mt-1">{section}</p>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Final Quote Checklist</CardTitle>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm text-steel-700">
+                  {[
+                    'Confirm actual site width and height',
+                    'Check number of openings or running feet',
+                    'Confirm design pattern and bar spacing',
+                    'Add posts, hinges, lock, wheels or fixtures where needed',
+                    'Add transport and floor-height fitting difficulty',
+                    'Confirm paint, powder coating, polish or SS grade',
+                    'Apply daily steel market rate',
+                    'Round final quote after customer scope confirmation'
+                  ].map((item) => (
+                    <div key={item} className="rounded-lg border border-steel-200 bg-white p-3">
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
