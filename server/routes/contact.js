@@ -7,26 +7,29 @@ const Joi = require('joi');
 const contactSchema = Joi.object({
   name: Joi.string().trim().min(2).max(100).required(),
   email: Joi.string().email().required(),
-  phone: Joi.string().pattern(/^[\+]?[1-9][\d]{0,15}$/).required(),
-  subject: Joi.string().trim().min(2).max(200).allow('').optional(),
-  message: Joi.string().trim().min(2).max(2000).required(),
-  projectType: Joi.string().valid('window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'gate', 'staircase', 'custom', 'other').allow('').optional(),
-  projectBudget: Joi.string().valid('under_10k', '10k_25k', '25k_50k', '50k_100k', 'above_100k', 'not_specified').allow('').optional(),
-  urgency: Joi.string().valid('immediate', 'within_week', 'within_month', 'flexible').allow('').optional(),
+  phone: Joi.string().pattern(/^[\+]?[0-9][0-9\s-]{7,20}$/).required(),
+  subject: Joi.string().trim().min(5).max(200).required(),
+  message: Joi.string().trim().min(10).max(2000).required(),
+  projectType: Joi.string().valid('window_grill', 'security_grill', 'decorative_grill', 'balcony_grill', 'railing', 'gate', 'grill', 'shed', 'staircase', 'custom', 'other').optional(),
+  projectBudget: Joi.string().valid('under_10k', '10k_25k', '25k_50k', '50k_100k', 'above_100k', 'not_specified').optional(),
+  urgency: Joi.string().valid('immediate', 'within_week', 'within_month', 'flexible').optional(),
   calculatorData: Joi.object({
     dimensions: Joi.object({
       width: Joi.number().positive().optional(),
       height: Joi.number().positive().optional(),
-      widthUnit: Joi.string().valid('cm', 'mm', 'inch', 'ft', 'm').optional(),
-      heightUnit: Joi.string().valid('cm', 'mm', 'inch', 'ft', 'm').optional()
-    }).optional(),
+      widthUnit: Joi.string().valid('cm', 'mm', 'inch', 'inches', 'ft', 'feet', 'm').optional(),
+      heightUnit: Joi.string().valid('cm', 'mm', 'inch', 'inches', 'ft', 'feet', 'm').optional()
+    }).unknown(true).optional(),
     grillType: Joi.string().optional(),
     metalType: Joi.string().optional(),
     profileType: Joi.string().optional(),
-    estimatedWeight: Joi.number().positive().optional(),
-    estimatedCost: Joi.number().positive().optional(),
+	    quantity: Joi.number().integer().min(1).optional(),
+    estimatedWeight: Joi.number().min(0).optional(),
+    estimatedCost: Joi.number().min(0).optional(),
     calculatorType: Joi.string().valid('standard', 'advanced', 'rod_based').optional()
-  }).unknown(true).allow(null).optional(),
+  }).unknown(true).optional(),
+  sessionId: Joi.string().required(),
+  visitorId: Joi.string().required(),
   source: Joi.string().valid('website_contact', 'calculator_quote', 'service_inquiry', 'direct').optional()
 });
 
@@ -276,5 +279,59 @@ router.post('/submission/:id/note', async (req, res) => {
   }
 });
 
+// GET /api/contact/analytics - Get contact analytics
+router.get('/analytics', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    const analytics = await ContactSubmission.getContactAnalytics(startDate, endDate);
+    
+    // Get status breakdown
+    const statusBreakdown = await ContactSubmission.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Get source breakdown
+    const sourceBreakdown = await ContactSubmission.aggregate([
+      {
+        $group: {
+          _id: '$source',
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { count: -1 } }
+    ]);
+    
+    // Get recent submissions
+    const recentSubmissions = await ContactSubmission.find()
+      .sort({ submissionDate: -1 })
+      .limit(5)
+      .select('name email subject status submissionDate source');
+    
+    res.json({
+      success: true,
+      data: {
+        summary: analytics[0] || {},
+        statusBreakdown,
+        sourceBreakdown,
+        recentSubmissions
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error getting contact analytics:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get contact analytics',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router;
