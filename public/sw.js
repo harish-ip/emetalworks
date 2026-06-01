@@ -1,33 +1,18 @@
-const CACHE_NAME = 'emetalworks-v1';
-const STATIC_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-];
-
+// Temporary cleanup worker: force-remove stale caches and unregister.
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS))
-  );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.map((k) => caches.delete(k)));
+    await self.registration.unregister();
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    clients.forEach((client) => client.navigate(client.url));
+  })());
 });
 
-self.addEventListener('fetch', (event) => {
-  // Network first for API calls
-  if (event.request.url.includes('/api/')) {
-    return;
-  }
-  // Cache first for static assets
-  event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
-  );
+self.addEventListener('fetch', () => {
+  // No-op: let network handle everything.
 });

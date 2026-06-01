@@ -5,3 +5,4 @@ build/
 # Playwright
 playwright-report/
 test-results/
+dist/
