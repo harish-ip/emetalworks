@@ -266,6 +266,7 @@ export default function HomePage() {
 
 	  const [isSubmitting, setIsSubmitting] = useState(false);
 	  const [submitStatus, setSubmitStatus] = useState(null);
+	  const [formErrors, setFormErrors] = useState([]);
 	  const [includeCalculatorData, setIncludeCalculatorData] = useState(false);
 	  const [hasManualProjectTypeChange, setHasManualProjectTypeChange] = useState(false);
 
@@ -628,6 +629,7 @@ export default function HomePage() {
 	// Handle contact form input changes
 	const handleContactInputChange = (e) => {
 	  const { name, value } = e.target;
+	  setFormErrors([]);
 	  if (name === 'projectType') {
 	    setHasManualProjectTypeChange(true);
 	  }
