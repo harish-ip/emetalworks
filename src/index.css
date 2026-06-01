@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Poppins:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -10,7 +10,7 @@
   }
 
   body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Manrope', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     /* Improve mobile scrolling */
@@ -168,4 +168,69 @@
 
 .text-danger-800 {
   color: #991b1b;
+}
+
+:root {
+  --brand-cream: #faf5ee;
+  --brand-sand: #f2e6d6;
+  --brand-charcoal: #2d2a26;
+  --brand-clay: #b45f3e;
+  --brand-olive: #6f7b59;
+}
+
+body {
+  background: radial-gradient(circle at 10% 10%, #fffaf3 0%, #f6efe4 38%, #f4ece1 100%);
+  color: var(--brand-charcoal);
+}
+
+#root {
+  position: relative;
+}
+
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: linear-gradient(120deg, rgba(180, 95, 62, 0.05), rgba(111, 123, 89, 0.04));
+  z-index: -1;
+}
+
+.livspace-shell {
+  background: linear-gradient(180deg, rgba(255,255,255,0.74) 0%, rgba(250,245,238,0.95) 52%, rgba(255,255,255,0.86) 100%);
+}
+
+.livspace-tabs {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #eadfce;
+  box-shadow: 0 18px 40px -26px rgba(60, 42, 32, 0.35);
+}
+
+.livspace-home-card {
+  border: 1px solid #e9dcc8;
+  box-shadow: 0 24px 60px -30px rgba(44, 30, 17, 0.28);
+}
+
+.livspace-kicker {
+  letter-spacing: 0.2em;
+  color: var(--brand-clay);
+}
+
+.livspace-headline {
+  font-family: 'DM Serif Display', Georgia, serif;
+  letter-spacing: -0.02em;
+}
+
+.livspace-feature {
+  background: #fffdf9;
+  border-color: #eadfcd;
+}
+
+.livspace-cta {
+  background: linear-gradient(110deg, #b45f3e 0%, #995038 100%);
+  border-color: #995038;
+}
+
+.livspace-cta:hover {
+  background: linear-gradient(110deg, #9d5137 0%, #844430 100%);
 }
