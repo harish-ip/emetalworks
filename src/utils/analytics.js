@@ -1,7 +1,19 @@
 // Analytics and tracking utilities for eMetalWorks
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-const API_BASE_URL = RAW_API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    if (!window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1')) {
+      return window.location.origin.replace(/\/$/, '');
+    }
+  }
+
+  return 'http://localhost:5001';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
 const apiUrl = (path) => `${API_BASE_URL}${path}`;
 
 // Generate unique visitor ID and session ID
