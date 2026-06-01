@@ -10,7 +10,7 @@ const resolveApiBaseUrl = () => {
     }
   }
 
-  return 'http://localhost:5001';
+  return 'https://emetalworks-backend.onrender.com';
 };
 
 const API_BASE_URL = resolveApiBaseUrl();

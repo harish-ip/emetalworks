@@ -648,9 +648,31 @@ export default function HomePage() {
 	  }
 	}, [grillType, hasManualProjectTypeChange]);
 
+	const validateContactForm = (formData) => {
+	  const errors = [];
+	  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	  const phoneRegex = /^\+?[0-9][0-9\s().-]{7,24}$/;
+
+	  if (!formData.name || formData.name.trim().length < 2) errors.push('Name must be at least 2 characters.');
+	  if (!formData.email || !emailRegex.test(formData.email.trim())) errors.push('Enter a valid email address.');
+	  if (!formData.phone || !phoneRegex.test(formData.phone.trim())) errors.push('Enter a valid phone number.');
+	  if (!formData.subject || formData.subject.trim().length < 5) errors.push('Subject must be at least 5 characters.');
+	  if (!formData.message || formData.message.trim().length < 10) errors.push('Message must be at least 10 characters.');
+
+	  return errors;
+	};
 	// Handle contact form submission
 	const handleContactSubmit = async (e) => {
     e.preventDefault();
+
+    const validationErrors = validateContactForm(contactForm);
+    if (validationErrors.length > 0) {
+      setFormErrors(validationErrors);
+      setSubmitStatus(null);
+      return;
+    }
+
+    setFormErrors([]);
     setIsSubmitting(true);
     setSubmitStatus(null);
 
@@ -1890,6 +1912,21 @@ export default function HomePage() {
                         </motion.div>
                       )}
 
+                      {/* Validation Message */}
+                      {formErrors.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="mb-6 p-4 bg-warning-50 border border-warning-200 rounded-xl"
+                        >
+                          <p className="text-warning-800 font-medium mb-2">Please fix the following:</p>
+                          <ul className="list-disc pl-5 text-warning-800 text-sm space-y-1">
+                            {formErrors.map((err) => (
+                              <li key={err}>{err}</li>
+                            ))}
+                          </ul>
+                        </motion.div>
+                      )}
                       {/* Error Message */}
                       {submitStatus === 'error' && (
                         <motion.div
