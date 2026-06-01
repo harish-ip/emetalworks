@@ -5,8 +5,28 @@ import { Card, CardContent, CardTitle } from '../components/ui/card.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 
-const RAW_API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
-const API_BASE_URL = RAW_API_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+const resolveApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_URL;
+  if (envUrl) return envUrl.replace(/\/api\/?$/, '').replace(/\/$/, '');
+
+  if (typeof window !== 'undefined') {
+    const host = window.location?.hostname || '';
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:5001';
+  }
+
+  // Render production fallback (override with VITE_API_URL)
+  return 'https://emetalworks-backend.onrender.com';
+};
+
+const API_BASE_URL = resolveApiBaseUrl();
+const authHeader = () => {
+  const token = localStorage.getItem('admin_token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const getContactId = (contact) => contact?._id || contact?.id;
+const getContactDate = (contact) => contact?.submissionDate || contact?.createdAt || contact?.updatedAt;
+const normalizeText = (value) => (value || '').toString().toLowerCase();
 
 const QUOTE_CONFIG = {
   materialRates: {
@@ -84,7 +104,7 @@ export default function AdminDashboard() {
         subject: 'Balcony Railing',
         message: 'Need decorative railing for balcony',
         createdAt: new Date(Date.now() - 172800000).toISOString(),
-        status: 'completed'
+        status: 'closed'
       }
     ]
   });
@@ -173,16 +193,12 @@ export default function AdminDashboard() {
 
   // Check if already authenticated
   useEffect(() => {
-    console.log('useEffect: Checking authentication...');
     const token = localStorage.getItem('admin_token');
-    console.log('useEffect: Token found:', !!token);
     if (token) {
-      console.log('useEffect: Setting authenticated to true');
       setIsAuthenticated(true);
       loadDashboardData(); // Load dashboard data on authentication
       loadContacts(); // Load contacts data on authentication
     } else {
-      console.log('useEffect: No token, staying unauthenticated');
       setIsAuthenticated(false);
     }
   }, []);
@@ -204,10 +220,8 @@ export default function AdminDashboard() {
       const data = await response.json();
 
       if (data.success) {
-        console.log('Login successful, setting authenticated to true');
         localStorage.setItem('admin_token', data.token);
         setIsAuthenticated(true);
-        console.log('Authentication state should now be true');
         loadDashboardData(); // Load dashboard data after successful login
         loadContacts(); // Load contacts data after successful login
       } else {
@@ -222,26 +236,24 @@ export default function AdminDashboard() {
 
   const loadDashboardData = async () => {
   setLoading(true);
-  console.log('Loading dashboard data from API...');
 
   try {
-    const token = localStorage.getItem('admin_token');
-
     // Load dashboard stats
     const dashboardResponse = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
       headers: {
-        'Authorization': `Bearer ${token}`
+        ...authHeader(),
       }
     });
 
     // Load contact submissions
-    const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`);
+    const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`, {
+      headers: {
+        ...authHeader(),
+      }
+    });
 
     const dashboardData = await dashboardResponse.json();
     const contactsData = await contactsResponse.json();
-
-    console.log('Dashboard API response:', dashboardData);
-    console.log('Contacts API response:', contactsData);
 
     if (dashboardData.success && contactsData.success) {
       const submissions = contactsData.data.submissions || [];
@@ -253,19 +265,12 @@ export default function AdminDashboard() {
         recentContacts: submissions.slice(-5).reverse() // Show 5 most recent
       };
 
-      console.log('Setting dashboard data:', updatedDashboardData);
-      console.log('Setting contacts data:', submissions);
-      console.log('First contact sample:', submissions[0]);
-      if (submissions[0]) {
-        console.log('Calculator data in first contact:', submissions[0].calculatorData);
-      }
       setDashboardData(updatedDashboardData);
       setContacts(submissions);
     } else {
       setError('Failed to load dashboard data');
     }
   } catch (error) {
-    console.error('Dashboard API error:', error);
     setError('Dashboard API not available - using demo mode');
     // Set demo data for development
     setDashboardData({
@@ -281,22 +286,21 @@ export default function AdminDashboard() {
 
   const loadContacts = async () => {
     setLoading(true);
-    console.log('Loading contacts from API...');
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/contact/submissions`);
+      const response = await fetch(`${API_BASE_URL}/api/contact/submissions`, {
+        headers: {
+          ...authHeader(),
+        }
+      });
       const data = await response.json();
 
       if (data.success && data.data.submissions) {
-        console.log('✅ Contacts loaded successfully:', data.data.submissions.length);
-        console.log('✅ First contact sample:', data.data.submissions[0]);
         setContacts(data.data.submissions);
       } else {
-        console.error('❌ Failed to load contacts:', data.message);
         setContacts([]);
       }
     } catch (error) {
-      console.error('❌ Error loading contacts:', error);
       setContacts([]);
     }
 
@@ -312,11 +316,10 @@ export default function AdminDashboard() {
 
   const updateContactStatus = async (contactId, status) => {
     try {
-      const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/status`, {
         method: 'PUT',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...authHeader(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ status })
@@ -326,7 +329,7 @@ export default function AdminDashboard() {
         loadContacts(); // Reload contacts
       }
     } catch (error) {
-      console.error('Failed to update contact status:', error);
+      // ignore; user can retry
     }
   };
 
@@ -334,11 +337,10 @@ export default function AdminDashboard() {
     if (!adminNote.trim()) return;
 
     try {
-      const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/note`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          ...authHeader(),
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ note: adminNote })
@@ -349,16 +351,15 @@ export default function AdminDashboard() {
         loadContacts(); // Reload contacts
       }
     } catch (error) {
-      console.error('Failed to add admin note:', error);
+      // ignore; user can retry
     }
   };
 
   const exportContacts = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/api/admin/export/contacts`, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          ...authHeader(),
         }
       });
 
@@ -374,25 +375,21 @@ export default function AdminDashboard() {
         document.body.removeChild(a);
       }
     } catch (error) {
-      console.error('Failed to export contacts:', error);
+      // ignore; user can retry
     }
   };
 
   const filteredContacts = contacts.filter(contact => {
     const matchesStatus = filterStatus === 'all' || contact.status === filterStatus;
     const matchesSearch = !searchTerm ||
-      contact.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      contact.subject.toLowerCase().includes(searchTerm.toLowerCase());
+      normalizeText(contact.name).includes(normalizeText(searchTerm)) ||
+      normalizeText(contact.email).includes(normalizeText(searchTerm)) ||
+      normalizeText(contact.phone).includes(normalizeText(searchTerm)) ||
+      normalizeText(contact.subject).includes(normalizeText(searchTerm));
     return matchesStatus && matchesSearch;
   });
 
-  console.log('Render: isAuthenticated =', isAuthenticated);
-  console.log('Render: activeView =', activeView);
-  console.log('Render: dashboardData =', dashboardData);
-
   if (!isAuthenticated) {
-    console.log('Render: Showing login form');
     return (
       <div className="min-h-screen bg-gradient-to-br from-steel-50 to-steel-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -427,7 +424,6 @@ export default function AdminDashboard() {
   }
 
   // FULL DASHBOARD INTERFACE
-  console.log('Render: Showing full dashboard interface');
   return (
     <div className="min-h-screen bg-gradient-to-br from-steel-50 to-steel-100 p-4">
       <div className="max-w-7xl mx-auto">
@@ -467,7 +463,7 @@ export default function AdminDashboard() {
         {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Button
-            variant={activeView === 'dashboard' ? 'default' : 'outline'}
+            variant={activeView === 'dashboard' ? 'primary' : 'outline'}
             onClick={() => {
               setActiveView('dashboard');
               loadDashboardData(); // Refresh data when switching to dashboard
@@ -477,7 +473,7 @@ export default function AdminDashboard() {
             📊 Dashboard
           </Button>
           <Button
-            variant={activeView === 'contacts' ? 'default' : 'outline'}
+            variant={activeView === 'contacts' ? 'primary' : 'outline'}
             onClick={() => {
               setActiveView('contacts');
               loadContacts(); // Refresh contacts when switching to contacts view
@@ -487,7 +483,7 @@ export default function AdminDashboard() {
             📋 Contacts
           </Button>
           <Button
-            variant={activeView === 'analytics' ? 'default' : 'outline'}
+            variant={activeView === 'analytics' ? 'primary' : 'outline'}
             onClick={() => {
               setActiveView('analytics');
               loadDashboardData(); // Refresh data when switching to analytics
@@ -497,7 +493,7 @@ export default function AdminDashboard() {
             📈 Analytics
           </Button>
           <Button
-            variant={activeView === 'quotation' ? 'default' : 'outline'}
+            variant={activeView === 'quotation' ? 'primary' : 'outline'}
             onClick={() => setActiveView('quotation')}
             className="flex items-center gap-2"
           >
@@ -529,7 +525,6 @@ export default function AdminDashboard() {
         )}
 
         {/* Dashboard View */}
-        {console.log('Render check - activeView:', activeView, 'dashboardData:', dashboardData)}
         {activeView === 'dashboard' && !dashboardData && !loading && (
           <div className="text-center py-8">
             <div className="text-steel-600">No dashboard data available. Click "📊 Dashboard" to reload.</div>
@@ -592,16 +587,21 @@ export default function AdminDashboard() {
                 <div className="space-y-4">
                   {dashboardData.recentContacts && dashboardData.recentContacts.length > 0 ? (
                     dashboardData.recentContacts.map((contact) => (
-                      <div key={contact.id} className="flex items-center justify-between p-4 bg-steel-50 rounded-lg">
+                      <div key={getContactId(contact)} className="flex items-center justify-between p-4 bg-steel-50 rounded-lg">
                         <div>
                           <p className="font-medium">{contact.name}</p>
                           <p className="text-sm text-steel-600">{contact.subject}</p>
-                          <p className="text-xs text-steel-500">{new Date(contact.createdAt).toLocaleDateString()}</p>
+                          <p className="text-xs text-steel-500">
+                            {getContactDate(contact) ? new Date(getContactDate(contact)).toLocaleDateString() : ''}
+                          </p>
                         </div>
                         <div className={`px-2 py-1 rounded text-xs font-medium ${
                           contact.status === 'new' ? 'bg-blue-100 text-blue-800' :
                           contact.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                          contact.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          contact.status === 'quoted' ? 'bg-purple-100 text-purple-800' :
+                          contact.status === 'converted' ? 'bg-green-100 text-green-800' :
+                          contact.status === 'closed' ? 'bg-steel-200 text-steel-800' :
+                          contact.status === 'spam' ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           {contact.status}
@@ -632,7 +632,10 @@ export default function AdminDashboard() {
                   <option value="all">All Status</option>
                   <option value="new">New</option>
                   <option value="contacted">Contacted</option>
-                  <option value="completed">Completed</option>
+                  <option value="quoted">Quoted</option>
+                  <option value="converted">Converted</option>
+                  <option value="closed">Closed</option>
+                  <option value="spam">Spam</option>
                 </select>
                 <input
                   type="text"
@@ -651,7 +654,7 @@ export default function AdminDashboard() {
             <div className="grid gap-4">
               {filteredContacts.length > 0 ? (
                 filteredContacts.map((contact) => (
-                  <Card key={contact.id} className="hover:shadow-lg transition-shadow">
+                  <Card key={getContactId(contact)} className="hover:shadow-lg transition-shadow">
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
                         <div className="flex-1 space-y-3">
@@ -666,13 +669,16 @@ export default function AdminDashboard() {
                               <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                                 contact.status === 'new' ? 'bg-blue-100 text-blue-800' :
                                 contact.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                                contact.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                contact.status === 'quoted' ? 'bg-purple-100 text-purple-800' :
+                                contact.status === 'converted' ? 'bg-green-100 text-green-800' :
+                                contact.status === 'closed' ? 'bg-steel-200 text-steel-800' :
+                                contact.status === 'spam' ? 'bg-red-100 text-red-800' :
                                 'bg-gray-100 text-gray-800'
                               }`}>
                                 {contact.status}
                               </span>
                               <span className="text-xs text-steel-500">
-                                {new Date(contact.createdAt).toLocaleDateString()}
+                                {getContactDate(contact) ? new Date(getContactDate(contact)).toLocaleDateString() : ''}
                               </span>
                             </div>
                           </div>
