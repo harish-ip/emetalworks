@@ -13,8 +13,49 @@ const app = express();
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin');
 
+// CORS configuration
+const envOrigins = [
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URLS,
+]
+  .filter(Boolean)
+  .flatMap((value) => value.split(','))
+  .map((origin) => origin.trim().replace(/\/$/, ''))
+  .filter(Boolean);
+
+const allowedOrigins = [
+  ...envOrigins,
+  'https://emetalworks-frontends.onrender.com',
+  'https://emetalworks.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:3001',
+  'http://localhost:3002',
+  'http://localhost:5173',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  // Local network (mobile testing on same WiFi)
+  'http://192.168.29.203:3000',
+  'http://192.168.208.1:3000',
+].map((origin) => origin.replace(/\/$/, ''));
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    const normalizedOrigin = origin ? origin.replace(/\/$/, '') : origin;
+    if (!normalizedOrigin || allowedOrigins.includes(normalizedOrigin)) {
+      callback(null, true);
+    } else {
+      callback(new Error(`CORS blocked: ${origin}`));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Security middleware
 app.use(helmet());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -25,32 +66,6 @@ const limiter = rateLimit({
   }
 });
 app.use('/api/', limiter);
-
-// CORS configuration
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
-  'http://localhost:3000',
-  'http://localhost:3001',
-  'http://localhost:3002',
-  'http://localhost:5173',
-  // Local network (mobile testing on same WiFi)
-  'http://192.168.29.203:3000',
-  'http://192.168.208.1:3000',
-].filter(Boolean);
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error(`CORS blocked: ${origin}`));
-    }
-  },
-  credentials: true,
-  optionsSuccessStatus: 200
-};
-app.use(cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
