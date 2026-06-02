@@ -113,6 +113,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState(null);
   const [activeView, setActiveView] = useState('dashboard');
   const [selectedContact, setSelectedContact] = useState(null);
+  const [detailsContact, setDetailsContact] = useState(null);
   const [adminNote, setAdminNote] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -650,172 +651,320 @@ export default function AdminDashboard() {
               </div>
             </div>
 
-            {/* Contacts List */}
-            <div className="grid gap-4">
-              {filteredContacts.length > 0 ? (
-                filteredContacts.map((contact) => (
-                  <Card key={getContactId(contact)} className="hover:shadow-lg transition-shadow">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col lg:flex-row justify-between items-start gap-4">
-                        <div className="flex-1 space-y-3">
-                          {/* Contact Header */}
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            {/* Contacts Table */}
+            <Card>
+              <CardContent className="p-0">
+                {filteredContacts.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-steel-100">
+                        <tr>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700">Name</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700 whitespace-nowrap">Phone Number</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700 whitespace-nowrap">Project Type</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700">Comments</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700">Status</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700">Remarks</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredContacts.map((contact) => {
+                          const contactId = getContactId(contact);
+                          const noteCount = Array.isArray(contact.adminNotes) ? contact.adminNotes.length : 0;
+                          return (
+                            <tr key={contactId} className="border-t border-steel-200 hover:bg-steel-50">
+                              <td className="px-4 py-3 align-top">
+                                <button
+                                  type="button"
+                                  onClick={() => setDetailsContact(contact)}
+                                  className="font-medium text-steel-900 hover:text-steel-700 hover:underline text-left"
+                                >
+                                  {contact.name}
+                                </button>
+                                {contact.email && (
+                                  <div className="text-xs text-steel-500">{contact.email}</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 align-top text-sm text-steel-700 whitespace-nowrap">
+                                {contact.phone || '—'}
+                              </td>
+                              <td className="px-4 py-3 align-top text-sm text-steel-700">
+                                {contact.subject || contact.workType || contact.projectType || '—'}
+                              </td>
+                              <td className="px-4 py-3 align-top text-sm text-steel-600 max-w-xs">
+                                <p className="line-clamp-3 whitespace-pre-wrap break-words">
+                                  {contact.message || '—'}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <select
+                                  value={contact.status || 'new'}
+                                  onChange={(e) => updateContactStatus(contactId, e.target.value)}
+                                  className="px-2 py-1 text-sm border border-steel-300 rounded-lg focus:ring-2 focus:ring-steel-500 focus:border-transparent bg-white"
+                                >
+                                  <option value="new">New</option>
+                                  <option value="contacted">Contacted</option>
+                                  <option value="quoted">Quoted</option>
+                                  <option value="converted">Converted</option>
+                                  <option value="closed">Completed</option>
+                                  <option value="spam">Spam</option>
+                                </select>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setSelectedContact(contact);
+                                    setAdminNote('');
+                                  }}
+                                  className="whitespace-nowrap"
+                                >
+                                  📝 Notes{noteCount ? ` (${noteCount})` : ''}
+                                </Button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="p-8 text-center">
+                    <p className="text-steel-500">No contacts found matching your criteria.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Remarks Modal */}
+            {selectedContact && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                onClick={() => setSelectedContact(null)}
+              >
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Contact remarks"
+                  data-testid="remarks-modal"
+                  className="bg-white rounded-lg shadow-xl max-w-lg w-full max-h-[85vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-steel-900">
+                          Remarks for {selectedContact.name}
+                        </h3>
+                        {selectedContact.email && (
+                          <p className="text-sm text-steel-500">{selectedContact.email}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setSelectedContact(null)}
+                        className="text-steel-500 hover:text-steel-700 text-2xl leading-none"
+                        aria-label="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {Array.isArray(selectedContact.adminNotes) && selectedContact.adminNotes.length > 0 ? (
+                        selectedContact.adminNotes.map((note, idx) => (
+                          <div key={idx} className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-sm text-yellow-800 whitespace-pre-wrap">{note.note}</p>
+                            <p className="text-xs text-yellow-600 mt-1">
+                              {note.addedBy || 'admin'}
+                              {note.addedAt ? ` · ${new Date(note.addedAt).toLocaleString()}` : ''}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-steel-500">No remarks yet.</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="block text-sm font-medium text-steel-700">Add a remark</label>
+                      <textarea
+                        value={adminNote}
+                        onChange={(e) => setAdminNote(e.target.value)}
+                        rows={3}
+                        placeholder="Enter remark..."
+                        className="w-full px-3 py-2 border border-steel-300 rounded-lg focus:ring-2 focus:ring-steel-500 focus:border-transparent"
+                      />
+                      <div className="flex justify-end gap-2">
+                        <Button variant="outline" onClick={() => setSelectedContact(null)}>
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={async () => {
+                            await addAdminNote(getContactId(selectedContact));
+                            setSelectedContact(null);
+                          }}
+                          disabled={!adminNote.trim()}
+                        >
+                          Save Remark
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Details Modal */}
+            {detailsContact && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+                onClick={() => setDetailsContact(null)}
+              >
+                <div
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="Contact details"
+                  data-testid="details-modal"
+                  className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-lg font-semibold text-steel-900">{detailsContact.name}</h3>
+                        {detailsContact.email && (
+                          <p className="text-sm text-steel-500">{detailsContact.email}</p>
+                        )}
+                        {detailsContact.phone && (
+                          <p className="text-sm text-steel-500">{detailsContact.phone}</p>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setDetailsContact(null)}
+                        className="text-steel-500 hover:text-steel-700 text-2xl leading-none"
+                        aria-label="Close"
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                      {detailsContact.subject && (
+                        <div>
+                          <span className="font-medium text-steel-700">Subject: </span>
+                          <span className="text-steel-600">{detailsContact.subject}</span>
+                        </div>
+                      )}
+                      {detailsContact.projectType && (
+                        <div>
+                          <span className="font-medium text-steel-700">Project Type: </span>
+                          <span className="text-steel-600">{detailsContact.projectType}</span>
+                        </div>
+                      )}
+                      {detailsContact.projectBudget && (
+                        <div>
+                          <span className="font-medium text-steel-700">Budget: </span>
+                          <span className="text-steel-600">{detailsContact.projectBudget}</span>
+                        </div>
+                      )}
+                      {detailsContact.urgency && (
+                        <div>
+                          <span className="font-medium text-steel-700">Urgency: </span>
+                          <span className="text-steel-600">{detailsContact.urgency}</span>
+                        </div>
+                      )}
+                      {detailsContact.source && (
+                        <div>
+                          <span className="font-medium text-steel-700">Source: </span>
+                          <span className="text-steel-600">{detailsContact.source}</span>
+                        </div>
+                      )}
+                      {getContactDate(detailsContact) && (
+                        <div>
+                          <span className="font-medium text-steel-700">Submitted: </span>
+                          <span className="text-steel-600">
+                            {new Date(getContactDate(detailsContact)).toLocaleString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {detailsContact.message && (
+                      <div>
+                        <p className="text-sm font-medium text-steel-700 mb-1">Message</p>
+                        <p className="text-sm text-steel-600 whitespace-pre-wrap break-words">
+                          {detailsContact.message}
+                        </p>
+                      </div>
+                    )}
+
+                    {detailsContact.calculatorData && (
+                      <div className="p-4 bg-steel-50 rounded-lg">
+                        <h4 className="text-sm font-medium text-steel-700 mb-2">Calculator Data</h4>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                          {detailsContact.calculatorData.dimensions && (
                             <div>
-                              <h3 className="text-lg font-semibold text-steel-900">{contact.name}</h3>
-                              <p className="text-steel-600">{contact.email}</p>
-                              {contact.phone && <p className="text-steel-600">{contact.phone}</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                                contact.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                                contact.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                                contact.status === 'quoted' ? 'bg-purple-100 text-purple-800' :
-                                contact.status === 'converted' ? 'bg-green-100 text-green-800' :
-                                contact.status === 'closed' ? 'bg-steel-200 text-steel-800' :
-                                contact.status === 'spam' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {contact.status}
-                              </span>
-                              <span className="text-xs text-steel-500">
-                                {getContactDate(contact) ? new Date(getContactDate(contact)).toLocaleDateString() : ''}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Contact Details */}
-                          <div className="space-y-2">
-                            {contact.subject && (
-                              <div>
-                                <span className="text-sm font-medium text-steel-700">Subject: </span>
-                                <span className="text-sm text-steel-600">{contact.subject}</span>
-                              </div>
-                            )}
-                            {contact.projectType && (
-                              <div>
-                                <span className="text-sm font-medium text-steel-700">Project Type: </span>
-                                <span className="text-sm text-steel-600">{contact.projectType}</span>
-                              </div>
-                            )}
-                            {contact.message && (
-                              <div>
-                                <span className="text-sm font-medium text-steel-700">Message: </span>
-                                <p className="text-sm text-steel-600 mt-1">{contact.message}</p>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Calculator Data */}
-                          {contact.calculatorData && (
-                            <div className="mt-4 p-4 bg-steel-50 rounded-lg">
-                              <h4 className="text-sm font-medium text-steel-700 mb-2">Calculator Data:</h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                                {contact.calculatorData.dimensions && (
-                                  <div>
-                                    <span className="font-medium">Dimensions: </span>
-                                    {contact.calculatorData.dimensions.width} × {contact.calculatorData.dimensions.height}
-                                    {contact.calculatorData.dimensions.widthUnit || 'ft'} × {contact.calculatorData.dimensions.heightUnit || 'ft'}
-                                  </div>
-                                )}
-                                {contact.calculatorData.grillType && (
-                                  <div>
-                                    <span className="font-medium">Grill Type: </span>
-                                    {contact.calculatorData.grillType}
-                                  </div>
-                                )}
-                                {contact.calculatorData.metalType && (
-                                  <div>
-                                    <span className="font-medium">Metal Type: </span>
-                                    {contact.calculatorData.metalType}
-                                  </div>
-                                )}
-                                {contact.calculatorData.profileType && (
-                                  <div>
-                                    <span className="font-medium">Profile: </span>
-                                    {contact.calculatorData.profileType}
-                                  </div>
-                                )}
-	                                {contact.calculatorData.quantity && (
-	                                  <div>
-	                                    <span className="font-medium">Quantity: </span>
-	                                    {contact.calculatorData.quantity}
-	                                  </div>
-	                                )}
-                                {contact.calculatorData.estimatedWeight && (
-                                  <div>
-                                    <span className="font-medium">Weight: </span>
-                                    {Math.round(contact.calculatorData.estimatedWeight)} kg
-                                  </div>
-                                )}
-                                {contact.calculatorData.estimatedCost && (
-                                  <div>
-                                    <span className="font-medium">Cost: </span>
-                                    ₹{Math.round(contact.calculatorData.estimatedCost)}
-                                  </div>
-                                )}
-                                {contact.calculatorData.calculatorType && (
-                                  <div>
-                                    <span className="font-medium">Calculator: </span>
-                                    {contact.calculatorData.calculatorType}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Rod Calculation Details */}
-                              {contact.calculatorData.rodCalculation && (
-                                <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
-                                  <h5 className="text-sm font-medium text-green-800 mb-2">Rod Configuration:</h5>
-                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                                    <div>
-                                      <span className="font-medium text-green-700">Vertical Rods: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.verticalRods}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-green-700">Horizontal Rods: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.horizontalRods}</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-green-700">Rod Diameter: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.rodDiameter}mm</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-green-700">Vertical Length: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.verticalRodLength}ft</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-green-700">Horizontal Length: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.horizontalRodLength}ft</span>
-                                    </div>
-                                    <div>
-                                      <span className="font-medium text-green-700">Total Length: </span>
-                                      <span className="text-green-600">{contact.calculatorData.rodCalculation.totalRodLength}ft</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
+                              <span className="font-medium">Dimensions: </span>
+                              {detailsContact.calculatorData.dimensions.width} × {detailsContact.calculatorData.dimensions.height}
+                              {detailsContact.calculatorData.dimensions.widthUnit || 'ft'} × {detailsContact.calculatorData.dimensions.heightUnit || 'ft'}
                             </div>
                           )}
-
-                          {/* Admin Notes */}
-                          {contact.adminNote && (
-                            <div className="mt-3 p-3 bg-yellow-50 rounded-lg">
-                              <span className="text-sm font-medium text-yellow-700">Admin Note: </span>
-                              <p className="text-sm text-yellow-600 mt-1">{contact.adminNote}</p>
+                          {detailsContact.calculatorData.grillType && (
+                            <div>
+                              <span className="font-medium">Grill Type: </span>
+                              {detailsContact.calculatorData.grillType}
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.metalType && (
+                            <div>
+                              <span className="font-medium">Metal Type: </span>
+                              {detailsContact.calculatorData.metalType}
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.profileType && (
+                            <div>
+                              <span className="font-medium">Profile: </span>
+                              {detailsContact.calculatorData.profileType}
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.quantity && (
+                            <div>
+                              <span className="font-medium">Quantity: </span>
+                              {detailsContact.calculatorData.quantity}
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.estimatedWeight && (
+                            <div>
+                              <span className="font-medium">Weight: </span>
+                              {Math.round(detailsContact.calculatorData.estimatedWeight)} kg
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.estimatedCost && (
+                            <div>
+                              <span className="font-medium">Cost: </span>
+                              ₹{Math.round(detailsContact.calculatorData.estimatedCost)}
+                            </div>
+                          )}
+                          {detailsContact.calculatorData.calculatorType && (
+                            <div>
+                              <span className="font-medium">Calculator: </span>
+                              {detailsContact.calculatorData.calculatorType}
                             </div>
                           )}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                ))
-              ) : (
-                <Card>
-                  <CardContent className="p-8 text-center">
-                    <p className="text-steel-500">No contacts found matching your criteria.</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button variant="outline" onClick={() => setDetailsContact(null)}>
+                        Close
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
