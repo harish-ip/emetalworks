@@ -72,9 +72,16 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [dashboardData, setDashboardData] = useState({
-    totalVisits: 245,
+    totalVisits: 0,
+    calculatorPageVisits: 0,
+    uniqueVisitors: 0,
+    calculatorUniqueVisitors: 0,
+    recentCalculatorUsers: [],
+    hitsToday: 0,
+    dailyHits: [],
+    calculatorLeads: [],
     totalContacts: 38,
-    conversionRate: 15.5,
+    conversionRate: 0,
     recentContacts: [
       {
         id: 1,
@@ -253,17 +260,38 @@ export default function AdminDashboard() {
       }
     });
 
+    const analyticsResponse = await fetch(`${API_BASE_URL}/api/analytics/summary`, {
+      headers: {
+        ...authHeader(),
+      }
+    });
+
     const dashboardData = await dashboardResponse.json();
     const contactsData = await contactsResponse.json();
+    const analyticsData = await analyticsResponse.json();
 
-    if (dashboardData.success && contactsData.success) {
+    if (dashboardData.success && contactsData.success && analyticsData.success) {
       const submissions = contactsData.data.submissions || [];
+
+      // Named calculator leads = people who submitted a quote from the calculator
+      const calculatorLeads = submissions.filter((s) => s.source === 'calculator_quote');
 
       // Update dashboard data with real contact count
       const updatedDashboardData = {
         ...dashboardData.data,
+        totalVisits: analyticsData.data.totalVisits || 0,
+        calculatorPageVisits: analyticsData.data.calculatorPageVisits || 0,
+        uniqueVisitors: analyticsData.data.uniqueVisitors || 0,
+        calculatorUniqueVisitors: analyticsData.data.calculatorUniqueVisitors || 0,
+        recentCalculatorUsers: analyticsData.data.recentCalculatorUsers || [],
+        hitsToday: analyticsData.data.hitsToday || 0,
+        dailyHits: analyticsData.data.dailyHits || [],
+        calculatorHitsToday: analyticsData.data.calculatorHitsToday || 0,
+        dailyCalculatorHits: analyticsData.data.dailyCalculatorHits || [],
+        calculatorLeads,
         totalContacts: submissions.length,
-        recentContacts: submissions.slice(-5).reverse() // Show 5 most recent
+        conversionRate: 0,
+        recentContacts: submissions.slice(0, 5)
       };
 
       setDashboardData(updatedDashboardData);
@@ -276,6 +304,15 @@ export default function AdminDashboard() {
     // Set demo data for development
     setDashboardData({
       totalVisits: 0,
+      calculatorPageVisits: 0,
+      uniqueVisitors: 0,
+      calculatorUniqueVisitors: 0,
+      recentCalculatorUsers: [],
+      hitsToday: 0,
+      dailyHits: [],
+      calculatorHitsToday: 0,
+      dailyCalculatorHits: [],
+      calculatorLeads: [],
       totalContacts: 0,
       conversionRate: 0,
       recentContacts: []
@@ -534,7 +571,7 @@ export default function AdminDashboard() {
         {activeView === 'dashboard' && dashboardData && (
           <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -550,32 +587,10 @@ export default function AdminDashboard() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm font-medium text-steel-600">Total Contacts</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.totalContacts}</p>
+                      <p className="text-sm font-medium text-steel-600">Calculator Page Visits</p>
+                      <p className="text-3xl font-bold text-steel-900">{dashboardData.calculatorPageVisits}</p>
                     </div>
                     <div className="text-green-600">📧</div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-steel-600">Conversion Rate</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.conversionRate}%</p>
-                    </div>
-                    <div className="text-purple-600">📈</div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-steel-600">Active Projects</p>
-                      <p className="text-3xl font-bold text-steel-900">12</p>
-                    </div>
-                    <div className="text-orange-600">🔧</div>
                   </div>
                 </CardContent>
               </Card>
@@ -974,42 +989,167 @@ export default function AdminDashboard() {
             <Card>
               <CardContent className="p-6">
                 <CardTitle className="mb-4">Analytics Overview</CardTitle>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="font-medium mb-2">Conversion Funnel</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Total Visits</span>
-                        <span>{dashboardData.totalVisits}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Contacts</span>
-                        <span>{dashboardData.totalContacts}</span>
-                      </div>
-                      <div className="flex justify-between font-medium">
-                        <span>Conversion Rate</span>
-                        <span>{dashboardData.conversionRate}%</span>
-                      </div>
-                    </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="rounded-lg border border-steel-200 bg-steel-50 p-4">
+                    <p className="text-sm text-steel-600">Total Website Visits</p>
+                    <p className="mt-2 text-3xl font-bold text-steel-900">{dashboardData.totalVisits}</p>
                   </div>
-                  <div>
-                    <h3 className="font-medium mb-2">Performance Metrics</h3>
-                    <div className="space-y-2">
-                      <div className="flex justify-between">
-                        <span>Avg. Response Time</span>
-                        <span>2.5 hours</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Customer Satisfaction</span>
-                        <span>4.8/5</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Project Completion</span>
-                        <span>95%</span>
-                      </div>
-                    </div>
+                  <div className="rounded-lg border border-steel-200 bg-steel-50 p-4">
+                    <p className="text-sm text-steel-600">Unique Visitors</p>
+                    <p className="mt-2 text-3xl font-bold text-steel-900">{dashboardData.uniqueVisitors}</p>
+                  </div>
+                  <div className="rounded-lg border border-steel-200 bg-steel-50 p-4">
+                    <p className="text-sm text-steel-600">Calculator Page Visits</p>
+                    <p className="mt-2 text-3xl font-bold text-steel-900">{dashboardData.calculatorPageVisits}</p>
+                  </div>
+                  <div className="rounded-lg border border-steel-200 bg-steel-50 p-4">
+                    <p className="text-sm text-steel-600">Calculator Unique Visitors</p>
+                    <p className="mt-2 text-3xl font-bold text-steel-900">{dashboardData.calculatorUniqueVisitors}</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Daily hits: raw page loads per day (counts repeat visits, unlike unique visitors) */}
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Daily Hits</CardTitle>
+                <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <p className="text-sm text-blue-700">Website Hits Today</p>
+                    <p className="mt-2 text-4xl font-bold text-blue-700">{dashboardData.hitsToday}</p>
+                    <p className="mt-1 text-xs text-blue-600">Total page loads today (IST). Repeat visits are counted.</p>
+                  </div>
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                    <p className="text-sm text-orange-700">Calculator Opens Today</p>
+                    <p className="mt-2 text-4xl font-bold text-orange-700">{dashboardData.calculatorHitsToday}</p>
+                    <p className="mt-1 text-xs text-orange-600">Total calculator opens today (IST). Repeat opens are counted.</p>
+                  </div>
+                </div>
+                {(() => {
+                  // Merge the two daily series (dates may differ) into one table.
+                  const byDate = {};
+                  (dashboardData.dailyHits || []).forEach((d) => {
+                    byDate[d.date] = byDate[d.date] || { date: d.date, hits: 0, calc: 0 };
+                    byDate[d.date].hits = d.count;
+                  });
+                  (dashboardData.dailyCalculatorHits || []).forEach((d) => {
+                    byDate[d.date] = byDate[d.date] || { date: d.date, hits: 0, calc: 0 };
+                    byDate[d.date].calc = d.count;
+                  });
+                  const rows = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date));
+
+                  return rows.length === 0 ? (
+                    <p className="text-sm text-steel-600">No hits recorded yet.</p>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="text-left text-steel-600 border-b border-steel-200">
+                            <th className="py-2 pr-4 font-medium">Date</th>
+                            <th className="py-2 pr-4 font-medium">Website Hits</th>
+                            <th className="py-2 pr-4 font-medium">Calculator Opens</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {rows.map((r) => (
+                            <tr key={r.date} className="border-b border-steel-100">
+                              <td className="py-2 pr-4 text-steel-900">
+                                {new Date(r.date).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                              </td>
+                              <td className="py-2 pr-4 text-steel-700 font-semibold">{r.hits}</td>
+                              <td className="py-2 pr-4 text-steel-700 font-semibold">{r.calc}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                })()}
+              </CardContent>
+            </Card>
+
+            {/* Named calculator leads: people who submitted a quote from the calculator */}
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">
+                  Calculator Leads ({(dashboardData.calculatorLeads || []).length})
+                </CardTitle>
+                {(dashboardData.calculatorLeads || []).length === 0 ? (
+                  <p className="text-sm text-steel-600">No calculator quote submissions yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-steel-600 border-b border-steel-200">
+                          <th className="py-2 pr-4 font-medium">Name</th>
+                          <th className="py-2 pr-4 font-medium">Phone</th>
+                          <th className="py-2 pr-4 font-medium">Email</th>
+                          <th className="py-2 pr-4 font-medium">Est. Cost</th>
+                          <th className="py-2 pr-4 font-medium">Submitted</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(dashboardData.calculatorLeads || []).map((lead) => (
+                          <tr key={lead._id || lead.id} className="border-b border-steel-100">
+                            <td className="py-2 pr-4 text-steel-900">{lead.name}</td>
+                            <td className="py-2 pr-4 text-steel-700">{lead.phone}</td>
+                            <td className="py-2 pr-4 text-steel-700">{lead.email}</td>
+                            <td className="py-2 pr-4 text-steel-700">
+                              {lead.calculatorData?.estimatedCost
+                                ? `₹${Number(lead.calculatorData.estimatedCost).toLocaleString('en-IN')}`
+                                : '—'}
+                            </td>
+                            <td className="py-2 pr-4 text-steel-700">
+                              {lead.submissionDate
+                                ? new Date(lead.submissionDate).toLocaleDateString('en-IN')
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Anonymous reach: recent calculator sessions (no quote submitted) */}
+            <Card>
+              <CardContent className="p-6">
+                <CardTitle className="mb-4">Recent Calculator Sessions</CardTitle>
+                {(dashboardData.recentCalculatorUsers || []).length === 0 ? (
+                  <p className="text-sm text-steel-600">No calculator usage recorded yet.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-steel-600 border-b border-steel-200">
+                          <th className="py-2 pr-4 font-medium">Visitor</th>
+                          <th className="py-2 pr-4 font-medium">IP Address</th>
+                          <th className="py-2 pr-4 font-medium">Device</th>
+                          <th className="py-2 pr-4 font-medium">When</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(dashboardData.recentCalculatorUsers || []).map((u) => (
+                          <tr key={u.visitorId + u.firstSeenAt} className="border-b border-steel-100">
+                            <td className="py-2 pr-4 text-steel-900 font-mono text-xs">
+                              {(u.visitorId || '').slice(0, 20)}
+                            </td>
+                            <td className="py-2 pr-4 text-steel-700">{u.ipAddress || 'unknown'}</td>
+                            <td className="py-2 pr-4 text-steel-700 max-w-xs truncate" title={u.userAgent}>
+                              {u.userAgent || '—'}
+                            </td>
+                            <td className="py-2 pr-4 text-steel-700">
+                              {u.firstSeenAt ? new Date(u.firstSeenAt).toLocaleString('en-IN') : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -1178,3 +1318,4 @@ export default function AdminDashboard() {
     </div>
   );
 }
+

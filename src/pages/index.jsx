@@ -142,6 +142,16 @@ const PRICING_CONFIG = {
 	  staircase: 'staircase'
 	};
 
+const WHATSAPP_PHONE = '919985393064';
+const WHATSAPP_MESSAGE = encodeURIComponent('Hi eMetalWorks, I need help with a steel fabrication estimate.');
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_PHONE}?text=${WHATSAPP_MESSAGE}`;
+
+const WhatsAppIcon = ({ className = 'w-5 h-5' }) => (
+  <svg className={className} viewBox="0 0 32 32" fill="currentColor" aria-hidden="true">
+    <path d="M16.04 3.2C9 3.2 3.28 8.86 3.28 15.82c0 2.23.6 4.4 1.72 6.31L3.17 28.8l6.88-1.79a12.92 12.92 0 0 0 5.99 1.51c7.04 0 12.76-5.66 12.76-12.62S23.08 3.2 16.04 3.2Zm0 23.19c-1.9 0-3.75-.5-5.37-1.45l-.39-.23-4.08 1.06 1.09-3.92-.26-.4a10.28 10.28 0 0 1-1.6-5.54c0-5.78 4.76-10.49 10.61-10.49s10.61 4.7 10.61 10.49-4.76 10.48-10.61 10.48Zm5.82-7.85c-.32-.16-1.9-.93-2.2-1.04-.29-.11-.5-.16-.72.16-.21.32-.82 1.04-1.01 1.25-.19.21-.37.24-.69.08-.32-.16-1.35-.49-2.58-1.57-.95-.84-1.6-1.89-1.79-2.21-.19-.32-.02-.49.14-.65.15-.14.32-.37.48-.56.16-.19.21-.32.32-.53.11-.21.05-.4-.03-.56-.08-.16-.72-1.72-.98-2.36-.26-.62-.52-.54-.72-.55h-.61c-.21 0-.56.08-.85.4-.29.32-1.12 1.09-1.12 2.66s1.15 3.09 1.31 3.3c.16.21 2.27 3.43 5.5 4.8.77.33 1.37.53 1.84.68.77.24 1.47.21 2.02.13.62-.09 1.9-.77 2.17-1.52.27-.74.27-1.38.19-1.52-.08-.13-.29-.21-.61-.37Z" />
+  </svg>
+);
+
 export default function HomePage() {
   const [width, setWidth] = useState(0);
   const [height, setHeight] = useState(0);
@@ -232,7 +242,7 @@ export default function HomePage() {
 
   // Function to navigate to calculator with pre-selected grill type
   const goToCalculator = (serviceType = null) => {
-    if (serviceType) {
+    if (typeof serviceType === 'string' && serviceType) {
       // Map service types to grill types
       const serviceToGrillMap = {
         'Balcony Railings': 'balcony',
@@ -252,6 +262,13 @@ export default function HomePage() {
       }
     }
     handleTabSwitch('calculator');
+    // Smooth-scroll to the calculator anchor once the panel mounts
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById('calculator');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
   };
 
 	  // Contact form state
@@ -686,8 +703,7 @@ export default function HomePage() {
 	        projectType: contactForm.projectType || mappedProjectType || ''
 	      };
 
-	      // Track form submission attempt
-	      await trackContactFormInteraction('form_submit', contactFormWithProjectType);
+	      trackContactFormInteraction('form_submit', contactFormWithProjectType);
 
 	      // Prepare calculator data if available and user wants to include it
 	      const calculatorData = (includeCalculatorData && width > 0 && height > 0) ? {
@@ -767,6 +783,16 @@ export default function HomePage() {
 
   return (
     <main className="livspace-shell min-h-screen text-steel-800">
+      <a
+        href={WHATSAPP_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Chat with eMetalWorks on WhatsApp"
+        className="fixed bottom-5 right-5 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-hard transition-all duration-200 hover:scale-105 hover:bg-[#1ebe5d] focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 sm:h-16 sm:w-16"
+      >
+        <WhatsAppIcon className="h-8 w-8 sm:h-9 sm:w-9" />
+      </a>
+
       {/* Tabbed Content Section */}
       <section className="py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-7xl">
@@ -839,9 +865,24 @@ export default function HomePage() {
                       <p className="livspace-kicker mb-4 text-sm font-semibold uppercase">
                         Bhavya Fabrication Works
                       </p>
-                      <h1 className="livspace-headline text-4xl sm:text-5xl lg:text-6xl font-bold text-steel-950 mb-5 leading-tight">
-                        eMetalWorks for custom gates, grills, railings and sheds
-                      </h1>
+                      <div className="mb-5 flex flex-col items-start gap-5">
+                        <h1 className="livspace-headline text-4xl sm:text-5xl lg:text-6xl font-bold text-steel-950 leading-tight">
+                          eMetalWorks for custom gates, grills, railings and sheds
+                        </h1>
+                        <Button
+                          size="lg"
+                          className="w-full shrink-0 sm:w-auto !bg-blue-600 text-white shadow-glow hover:!bg-blue-700 hover:shadow-glow-lg"
+                          onClick={() => handleTabSwitch('calculator')}
+                          icon={
+                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          }
+                          iconPosition="right"
+                        >
+                          Get Free Estimate
+                        </Button>
+                      </div>
                       <p className="text-base sm:text-lg text-steel-600 mb-6 leading-relaxed">
                         A fabrication-first experience for homes, shops and apartments in Hyderabad: discuss your requirement, estimate the job, approve the design and track the work from measurement to installation.
                       </p>
@@ -875,19 +916,6 @@ export default function HomePage() {
                         className="flex flex-col sm:flex-row gap-3"
                       >
                         <Button
-                          size="lg"
-                          className="livspace-cta shadow-glow hover:shadow-glow-lg w-full sm:w-auto text-white"
-                          onClick={() => handleTabSwitch('calculator')}
-                          icon={
-                            <svg className="w-5 h-5 sm:w-6 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                          }
-                          iconPosition="right"
-                        >
-                          Get Free Estimate
-                        </Button>
-                        <Button
                           variant="outline"
                           size="lg"
                           className="w-full sm:w-auto"
@@ -899,6 +927,16 @@ export default function HomePage() {
                           }
                         >
                           Call Now
+                        </Button>
+                        <Button
+                          size="lg"
+                          className="w-full sm:w-auto bg-[#25D366] text-white shadow-medium hover:bg-[#1ebe5d]"
+                          href={WHATSAPP_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          icon={<WhatsAppIcon className="w-5 h-5 sm:w-6 sm:h-6" />}
+                        >
+                          WhatsApp
                         </Button>
                       </motion.div>
                     </motion.div>
@@ -990,6 +1028,15 @@ export default function HomePage() {
                         <p className="mt-2 text-sm leading-relaxed text-steel-600">{text}</p>
                       </div>
                     ))}
+                  </div>
+                  <div className="mt-8 flex justify-center">
+                    <Button
+                      variant="primary"
+                      size="lg"
+                      onClick={() => goToCalculator()}
+                    >
+                      Get an Estimate
+                    </Button>
                   </div>
                 </div>
               </motion.div>
@@ -1089,10 +1136,11 @@ export default function HomePage() {
             {/* Calculator Tab */}
             {activeTab === 'calculator' && (
               <motion.div
+                id="calculator"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="max-w-4xl mx-auto"
+                className="max-w-4xl mx-auto scroll-mt-24"
               >
                 <div className="text-center mb-8 sm:mb-12">
                   <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-steel-900 mb-4 sm:mb-6">
@@ -2127,6 +2175,24 @@ export default function HomePage() {
                               <p className="text-steel-600 text-sm sm:text-base">
                                 <a href="tel:+919985393064" className="hover:text-primary-600 transition-colors">
                                   +91 99853 93064
+                                </a>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3 sm:gap-4">
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-[#25D366]/15 rounded-xl flex items-center justify-center flex-shrink-0">
+                              <WhatsAppIcon className="w-6 h-6 text-[#25D366]" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h4 className="font-semibold text-steel-900 mb-1">WhatsApp</h4>
+                              <p className="text-steel-600 text-sm sm:text-base">
+                                <a
+                                  href={WHATSAPP_URL}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="hover:text-[#25D366] transition-colors"
+                                >
+                                  Chat directly on WhatsApp
                                 </a>
                               </p>
                             </div>

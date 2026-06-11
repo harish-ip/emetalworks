@@ -12,6 +12,7 @@ const app = express();
 // Import routes
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin');
+const analyticsRoutes = require('./routes/analytics');
 
 // CORS configuration
 const envOrigins = [
@@ -58,14 +59,30 @@ app.use(cors(corsOptions));
 app.options('*', cors(corsOptions));
 
 // Rate limiting
+// Analytics fires on every page load, so it must NOT share the budget that
+// protects real user actions (e.g. contact form submit) — otherwise a busy
+// visitor could get rate-limited out of submitting a quote.
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
   message: {
     error: 'Too many requests from this IP, please try again later.'
-  }
+  },
+  skip: (req) => req.originalUrl.startsWith('/api/analytics')
 });
 app.use('/api/', limiter);
+
+// Separate, generous limiter for fire-and-forget analytics beacons. High enough
+// that no real visitor is ever blocked, low enough to bound abuse.
+const analyticsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 600,
+  message: {
+    success: false,
+    message: 'Too many analytics requests.'
+  }
+});
+app.use('/api/analytics', analyticsLimiter);
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -98,6 +115,7 @@ connectDB();
 
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Health check endpoint (used by UptimeRobot to keep service alive)
 app.get('/api/health', (req, res) => {
