@@ -279,6 +279,55 @@ router.post('/submission/:id/note', async (req, res) => {
   }
 });
 
+// PUT /api/contact/submission/:id/followup - Set or clear a follow-up reminder
+router.put('/submission/:id/followup', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { followUpDate } = req.body; // ISO date string, or null/'' to clear
+
+    const submission = await ContactSubmission.findById(id);
+
+    if (!submission) {
+      return res.status(404).json({
+        success: false,
+        message: 'Contact submission not found'
+      });
+    }
+
+    if (followUpDate) {
+      const date = new Date(followUpDate);
+      if (isNaN(date.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid followUpDate value'
+        });
+      }
+      submission.followUpDate = date;
+    } else {
+      submission.followUpDate = undefined;
+    }
+
+    await submission.save();
+
+    res.json({
+      success: true,
+      message: 'Follow-up updated successfully',
+      data: {
+        id: submission._id,
+        followUpDate: submission.followUpDate || null
+      }
+    });
+
+  } catch (error) {
+    console.error('Error updating follow-up:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update follow-up',
+      error: error.message
+    });
+  }
+});
+
 // GET /api/contact/analytics - Get contact analytics
 router.get('/analytics', async (req, res) => {
   try {

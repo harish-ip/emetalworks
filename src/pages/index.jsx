@@ -643,6 +643,21 @@ export default function HomePage() {
 	  }
 	}, [activeTab]);
 
+	// Build a WhatsApp link that sends the current calculator estimate straight
+	// to the business — captures the lead at peak intent (Traya-style mobile flow).
+	const buildQuoteWhatsAppUrl = () => {
+	  const lines = [
+	    'Hi eMetalWorks, I used your calculator and would like a quote:',
+	    grillType ? `Work: ${grillType}${metalType ? ` / ${metalType}` : ''}` : null,
+	    width > 0 && height > 0 ? `Size: ${width}${widthUnit} x ${height}${heightUnit}` : null,
+	    quantity ? `Quantity: ${quantity}` : null,
+	    weight > 0 ? `Est. weight: ${Math.round(weight)} kg` : null,
+	    cost > 0 ? `Est. budget: Rs ${Math.round(cost).toLocaleString('en-IN')}` : null,
+	    'Please share the final price and next steps.'
+	  ].filter(Boolean);
+	  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
+	};
+
 	// Handle contact form input changes
 	const handleContactInputChange = (e) => {
 	  const { name, value } = e.target;
@@ -782,16 +797,45 @@ export default function HomePage() {
   ];
 
   return (
-    <main className="livspace-shell min-h-screen text-steel-800">
+    <main className="livspace-shell min-h-screen text-steel-800 pb-16 sm:pb-0">
+      {/* Desktop floating WhatsApp (mobile uses the sticky action bar below) */}
       <a
         href={WHATSAPP_URL}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat with eMetalWorks on WhatsApp"
-        className="fixed bottom-5 right-5 z-50 inline-flex h-14 w-14 items-center justify-center rounded-full bg-[#25D366] text-white shadow-hard transition-all duration-200 hover:scale-105 hover:bg-[#1ebe5d] focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2 sm:h-16 sm:w-16"
+        className="fixed bottom-5 right-5 z-50 hidden sm:inline-flex h-16 w-16 items-center justify-center rounded-full bg-[#25D366] text-white shadow-hard transition-all duration-200 hover:scale-105 hover:bg-[#1ebe5d] focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:ring-offset-2"
       >
-        <WhatsAppIcon className="h-8 w-8 sm:h-9 sm:w-9" />
+        <WhatsAppIcon className="h-9 w-9" />
       </a>
+
+      {/* Mobile sticky action bar — always-available Call / WhatsApp / Quote */}
+      <div className="fixed bottom-0 inset-x-0 z-50 grid grid-cols-3 border-t border-steel-200 bg-white/95 backdrop-blur-sm shadow-hard sm:hidden">
+        <a
+          href="tel:+919985393064"
+          className="flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-semibold text-steel-700 active:bg-steel-50"
+        >
+          <span className="text-lg leading-none">📞</span>
+          Call
+        </a>
+        <a
+          href={WHATSAPP_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-semibold text-white bg-[#25D366] active:bg-[#1ebe5b]"
+        >
+          <WhatsAppIcon className="h-5 w-5" />
+          WhatsApp
+        </a>
+        <button
+          type="button"
+          onClick={() => handleTabSwitch('calculator')}
+          className="flex flex-col items-center justify-center gap-0.5 py-2.5 text-xs font-semibold text-steel-700 active:bg-steel-50"
+        >
+          <span className="text-lg leading-none">🧮</span>
+          Get Quote
+        </button>
+      </div>
 
       {/* Tabbed Content Section */}
       <section className="py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
@@ -1818,8 +1862,18 @@ export default function HomePage() {
                                 </div>
                               )}
                             </div>
+                            <a
+                              href={buildQuoteWhatsAppUrl()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-[#25D366] px-5 py-3 font-semibold text-white shadow-soft hover:bg-[#1ebe5b] transition-colors"
+                            >
+                              <WhatsAppIcon className="w-5 h-5" />
+                              Get this quote on WhatsApp
+                            </a>
                             <Button
                               onClick={() => handleTabSwitch('contact')}
+                              variant="outline"
                               className="w-full sm:w-auto"
                             >
                               Send for Final Quote

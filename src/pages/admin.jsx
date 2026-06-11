@@ -28,6 +28,82 @@ const getContactId = (contact) => contact?._id || contact?.id;
 const getContactDate = (contact) => contact?.submissionDate || contact?.createdAt || contact?.updatedAt;
 const normalizeText = (value) => (value || '').toString().toLowerCase();
 
+// --- Customer contact helpers (click-to-call / click-to-WhatsApp) ---
+
+// Normalize a phone number to international digits (defaults to India +91)
+// for use in wa.me / tel: links. Returns '' if no usable number.
+const normalizePhone = (raw) => {
+  let digits = (raw || '').replace(/\D/g, '');
+  digits = digits.replace(/^0+/, ''); // drop domestic trunk prefix
+  if (digits.length === 10) digits = `91${digits}`; // bare 10-digit local number
+  return digits.length >= 11 ? digits : '';
+};
+
+// One-line summary of what the customer asked for — used in the WhatsApp message.
+const requirementSummary = (contact) => {
+  const parts = [];
+  const want = contact?.subject || contact?.projectType;
+  if (want) parts.push(want.toString().replace(/_/g, ' '));
+  const cd = contact?.calculatorData;
+  if (cd) {
+    if (cd.dimensions?.width && cd.dimensions?.height) {
+      parts.push(`${cd.dimensions.width}${cd.dimensions.widthUnit || 'ft'} x ${cd.dimensions.height}${cd.dimensions.heightUnit || 'ft'}`);
+    }
+    if (cd.grillType) parts.push(cd.grillType.toString().replace(/_/g, ' '));
+    if (cd.metalType) parts.push(cd.metalType);
+    if (cd.quantity) parts.push(`qty ${cd.quantity}`);
+    if (cd.estimatedCost) parts.push(`approx Rs ${Math.round(cd.estimatedCost).toLocaleString('en-IN')}`);
+  }
+  return parts.join(', ');
+};
+
+// Prefilled WhatsApp message that greets the customer by name and references
+// the exact requirement they submitted, so the owner can act immediately.
+const buildWhatsAppText = (contact) => {
+  const name = contact?.name ? ` ${contact.name}` : '';
+  const summary = requirementSummary(contact);
+  const reqLine = summary ? `\n\nYour requirement: ${summary}.` : '';
+  return encodeURIComponent(
+    `Hello${name}, this is eMetalWorks (Bhavya Fabrication Works) regarding your enquiry.` +
+    reqLine +
+    `\n\nWe'd be glad to help with your fabrication work. When is a good time to discuss the details and arrange a measurement?`
+  );
+};
+
+const whatsAppHref = (contact) => {
+  const phone = normalizePhone(contact?.phone);
+  return phone ? `https://wa.me/${phone}?text=${buildWhatsAppText(contact)}` : null;
+};
+
+const telHref = (contact) => {
+  const phone = normalizePhone(contact?.phone);
+  return phone ? `tel:+${phone}` : null;
+};
+
+// --- Follow-up reminders ---
+// Only open leads can be "due"; won/lost leads don't need chasing.
+const ACTIVE_FOR_FOLLOWUP = ['new', 'contacted', 'quoted'];
+
+// Returns 'overdue' | 'today' | 'upcoming' | null for a lead's follow-up date.
+const followUpStatus = (contact) => {
+  if (!contact?.followUpDate) return null;
+  if (!ACTIVE_FOR_FOLLOWUP.includes(contact.status || 'new')) return null;
+  const due = new Date(contact.followUpDate);
+  if (isNaN(due.getTime())) return null;
+  const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+  const endToday = new Date(); endToday.setHours(23, 59, 59, 999);
+  if (due < startToday) return 'overdue';
+  if (due <= endToday) return 'today';
+  return 'upcoming';
+};
+
+// Date-only 'YYYY-MM-DD' for <input type="date"> defaults.
+const toDateInput = (value) => {
+  if (!value) return '';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+};
+
 const QUOTE_CONFIG = {
   materialRates: {
     steel: 68,
@@ -124,6 +200,8 @@ export default function AdminDashboard() {
   const [adminNote, setAdminNote] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dueOnly, setDueOnly] = useState(false);
+  const [followUpDraft, setFollowUpDraft] = useState('');
   const [quoteForm, setQuoteForm] = useState({
     workType: 'window',
     material: 'steel',
@@ -371,6 +449,39 @@ export default function AdminDashboard() {
     }
   };
 
+  // When the owner reaches out via WhatsApp/Call, advance a brand-new lead to
+  // "contacted" automatically so the pipeline reflects reality without extra clicks.
+  const markContacted = (contact) => {
+    if ((contact?.status || 'new') === 'new') {
+      updateContactStatus(getContactId(contact), 'contacted');
+    }
+  };
+
+  const updateFollowUp = async (contactId, followUpDate) => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/followup`, {
+        method: 'PUT',
+        headers: {
+          ...authHeader(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ followUpDate: followUpDate || null })
+      });
+
+      if (response.ok) {
+        // Keep the open detail modal in sync without a full refetch.
+        setDetailsContact((prev) =>
+          prev && getContactId(prev) === contactId
+            ? { ...prev, followUpDate: followUpDate || null }
+            : prev
+        );
+        loadContacts();
+      }
+    } catch (error) {
+      // ignore; user can retry
+    }
+  };
+
   const addAdminNote = async (contactId) => {
     if (!adminNote.trim()) return;
 
@@ -424,8 +535,15 @@ export default function AdminDashboard() {
       normalizeText(contact.email).includes(normalizeText(searchTerm)) ||
       normalizeText(contact.phone).includes(normalizeText(searchTerm)) ||
       normalizeText(contact.subject).includes(normalizeText(searchTerm));
-    return matchesStatus && matchesSearch;
+    const due = followUpStatus(contact);
+    const matchesDue = !dueOnly || due === 'overdue' || due === 'today';
+    return matchesStatus && matchesSearch && matchesDue;
   });
+
+  const dueCount = contacts.filter((c) => {
+    const s = followUpStatus(c);
+    return s === 'overdue' || s === 'today';
+  }).length;
 
   if (!isAuthenticated) {
     return (
@@ -666,6 +784,44 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* Pipeline worklist — click a chip to filter; New = needs attention */}
+            {(() => {
+              const counts = (contacts || []).reduce((acc, c) => {
+                const s = c.status || 'new';
+                acc[s] = (acc[s] || 0) + 1;
+                return acc;
+              }, {});
+              const chips = [
+                { key: 'new', label: 'New', cls: 'bg-blue-100 text-blue-800' },
+                { key: 'contacted', label: 'Contacted', cls: 'bg-yellow-100 text-yellow-800' },
+                { key: 'quoted', label: 'Quoted', cls: 'bg-purple-100 text-purple-800' },
+                { key: 'converted', label: 'Converted', cls: 'bg-green-100 text-green-800' },
+                { key: 'closed', label: 'Completed', cls: 'bg-steel-200 text-steel-800' }
+              ];
+              return (
+                <div className="flex flex-wrap gap-2">
+                  {chips.map((ch) => (
+                    <button
+                      key={ch.key}
+                      type="button"
+                      onClick={() => { setDueOnly(false); setFilterStatus(filterStatus === ch.key ? 'all' : ch.key); }}
+                      className={`rounded-full px-3 py-1.5 text-sm font-medium ${ch.cls} ${!dueOnly && filterStatus === ch.key ? 'ring-2 ring-steel-500 ring-offset-1' : ''}`}
+                    >
+                      {ch.label}: {counts[ch.key] || 0}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { setFilterStatus('all'); setDueOnly((v) => !v); }}
+                    className={`rounded-full px-3 py-1.5 text-sm font-semibold ${dueCount > 0 ? 'bg-orange-100 text-orange-800' : 'bg-steel-100 text-steel-600'} ${dueOnly ? 'ring-2 ring-orange-500 ring-offset-1' : ''}`}
+                    title="Leads with a follow-up due today or overdue"
+                  >
+                    ⏰ Follow-ups due: {dueCount}
+                  </button>
+                </div>
+              );
+            })()}
+
             {/* Contacts Table */}
             <Card>
               <CardContent className="p-0">
@@ -679,6 +835,7 @@ export default function AdminDashboard() {
                           <th className="px-4 py-3 text-sm font-semibold text-steel-700 whitespace-nowrap">Project Type</th>
                           <th className="px-4 py-3 text-sm font-semibold text-steel-700">Comments</th>
                           <th className="px-4 py-3 text-sm font-semibold text-steel-700">Status</th>
+                          <th className="px-4 py-3 text-sm font-semibold text-steel-700">Contact</th>
                           <th className="px-4 py-3 text-sm font-semibold text-steel-700">Remarks</th>
                         </tr>
                       </thead>
@@ -686,18 +843,30 @@ export default function AdminDashboard() {
                         {filteredContacts.map((contact) => {
                           const contactId = getContactId(contact);
                           const noteCount = Array.isArray(contact.adminNotes) ? contact.adminNotes.length : 0;
+                          const due = followUpStatus(contact);
                           return (
                             <tr key={contactId} className="border-t border-steel-200 hover:bg-steel-50">
                               <td className="px-4 py-3 align-top">
                                 <button
                                   type="button"
-                                  onClick={() => setDetailsContact(contact)}
+                                  onClick={() => { setFollowUpDraft(toDateInput(contact.followUpDate)); setDetailsContact(contact); }}
                                   className="font-medium text-steel-900 hover:text-steel-700 hover:underline text-left"
                                 >
                                   {contact.name}
                                 </button>
                                 {contact.email && (
                                   <div className="text-xs text-steel-500">{contact.email}</div>
+                                )}
+                                {due && (
+                                  <div
+                                    className={`mt-1 inline-block rounded px-1.5 py-0.5 text-xs font-medium ${
+                                      due === 'overdue' ? 'bg-red-100 text-red-700'
+                                        : due === 'today' ? 'bg-orange-100 text-orange-700'
+                                        : 'bg-steel-100 text-steel-600'
+                                    }`}
+                                  >
+                                    ⏰ {due === 'overdue' ? 'Overdue' : due === 'today' ? 'Due today' : `Follow up ${toDateInput(contact.followUpDate)}`}
+                                  </div>
                                 )}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-steel-700 whitespace-nowrap">
@@ -724,6 +893,32 @@ export default function AdminDashboard() {
                                   <option value="closed">Completed</option>
                                   <option value="spam">Spam</option>
                                 </select>
+                              </td>
+                              <td className="px-4 py-3 align-top">
+                                {normalizePhone(contact.phone) ? (
+                                  <div className="flex items-center gap-2">
+                                    <a
+                                      href={whatsAppHref(contact)}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      onClick={() => markContacted(contact)}
+                                      title="Message on WhatsApp with their requirement prefilled"
+                                      className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1ebe5b] whitespace-nowrap"
+                                    >
+                                      WhatsApp
+                                    </a>
+                                    <a
+                                      href={telHref(contact)}
+                                      onClick={() => markContacted(contact)}
+                                      title="Call this customer"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-steel-300 px-2.5 py-1.5 text-xs font-semibold text-steel-700 hover:bg-steel-50 whitespace-nowrap"
+                                    >
+                                      📞 Call
+                                    </a>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-steel-400">No phone</span>
+                                )}
                               </td>
                               <td className="px-4 py-3 align-top">
                                 <Button
@@ -862,6 +1057,61 @@ export default function AdminDashboard() {
                       >
                         ×
                       </button>
+                    </div>
+
+                    {normalizePhone(detailsContact.phone) && (
+                      <div className="flex flex-wrap gap-2">
+                        <a
+                          href={whatsAppHref(detailsContact)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => markContacted(detailsContact)}
+                          className="inline-flex items-center gap-2 rounded-lg bg-[#25D366] px-4 py-2 text-sm font-semibold text-white hover:bg-[#1ebe5b]"
+                        >
+                          Message on WhatsApp
+                        </a>
+                        <a
+                          href={telHref(detailsContact)}
+                          onClick={() => markContacted(detailsContact)}
+                          className="inline-flex items-center gap-2 rounded-lg border border-steel-300 px-4 py-2 text-sm font-semibold text-steel-700 hover:bg-steel-50"
+                        >
+                          📞 Call {detailsContact.phone}
+                        </a>
+                      </div>
+                    )}
+
+                    {/* Follow-up reminder */}
+                    <div className="rounded-lg border border-steel-200 bg-steel-50 p-3">
+                      <p className="text-sm font-medium text-steel-700 mb-2">⏰ Follow-up reminder</p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          type="date"
+                          value={followUpDraft}
+                          onChange={(e) => setFollowUpDraft(e.target.value)}
+                          className="px-3 py-2 border border-steel-300 rounded-lg text-sm bg-white"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => updateFollowUp(getContactId(detailsContact), followUpDraft)}
+                          disabled={!followUpDraft}
+                        >
+                          Set reminder
+                        </Button>
+                        {detailsContact.followUpDate && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setFollowUpDraft(''); updateFollowUp(getContactId(detailsContact), null); }}
+                          >
+                            Clear
+                          </Button>
+                        )}
+                      </div>
+                      {detailsContact.followUpDate && (
+                        <p className="mt-2 text-xs text-steel-600">
+                          Currently set for {new Date(detailsContact.followUpDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}.
+                        </p>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
