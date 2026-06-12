@@ -767,10 +767,11 @@ export default function HomePage() {
         })
 	      } : null;
 
-	      // Submit to backend
+	      // Submit to backend (omit calculatorData entirely when there is none —
+	      // the API rejects null)
 	      await submitContactForm({
 	        ...contactFormWithProjectType,
-	        calculatorData
+	        ...(calculatorData ? { calculatorData } : {})
 	      });
 
 	      setSubmitStatus('success');
@@ -1190,22 +1191,8 @@ export default function HomePage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
-                className="max-w-4xl mx-auto scroll-mt-24"
+                className="max-w-6xl mx-auto scroll-mt-24"
               >
-                <div className="text-center mb-8 sm:mb-12">
-                  <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-display font-bold text-steel-900 mb-4 sm:mb-6">
-                    eMetalWorks <span className="text-accent-600">Calculator</span>
-                  </h2>
-                  <p className="text-base sm:text-lg md:text-xl text-steel-600 max-w-2xl mx-auto leading-relaxed">
-                    Get a simple budget estimate for your fabrication work. Choose the work type, material, and enter approximate width and height.
-                  </p>
-                  <div className="mt-4 p-3 bg-blue-50 rounded-lg max-w-2xl mx-auto">
-                    <p className="text-sm text-blue-800 text-center">
-                      <span className="font-medium">Quick estimate:</span> Feet is selected by default. Final quotation depends on site measurement, design, finish and installation.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Quote Notification */}
                 {quoteNotification && (
                   <motion.div
@@ -1220,11 +1207,163 @@ export default function HomePage() {
                   </motion.div>
                 )}
 
+                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+                  {/* ===== eMetal Calculator brand + live estimate panel ===== */}
+                  <div className="order-2 lg:order-1 lg:col-span-2 lg:sticky lg:top-24" data-testid="estimate-panel">
+                    <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white p-6 sm:p-8 shadow-xl">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-display font-extrabold text-xl shadow-lg">
+                          eM
+                        </div>
+                        <div>
+                          <h2 className="text-2xl font-display font-bold leading-tight">
+                            eMetal <span className="text-accent-400">Calculator</span>
+                          </h2>
+                          <p className="text-xs text-slate-400">Instant fabrication budget · Hyderabad</p>
+                        </div>
+                      </div>
+
+                      {(widthInCm > 0 && heightInCm > 0) ? (
+                        <motion.div
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.3 }}
+                          className="mt-6"
+                        >
+                          <p className="text-sm font-medium text-slate-300">Budget Estimate</p>
+                          <p data-testid="est-cost" className="text-4xl font-extrabold tracking-tight mt-1">
+                            ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
+                          </p>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {grillAreaSqMeters > 0 && cost > 0 && (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
+                                ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')}/sq.ft
+                              </span>
+                            )}
+                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-slate-200">
+                              All-inclusive estimate
+                            </span>
+                          </div>
+                          {minimumApplied && (
+                            <p className="mt-3 text-xs font-medium text-amber-300">
+                              ⚠ Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
+                            </p>
+                          )}
+
+                          <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                            <div className="rounded-xl bg-white/10 p-3" data-testid="est-weight">
+                              <p className="text-lg font-bold leading-none">{Math.round(isNaN(weight) ? 0 : weight)}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">kg · Est. Weight</p>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-3">
+                              <p className="text-lg font-bold leading-none">{(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">m · Material</p>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-3">
+                              <p className="text-lg font-bold leading-none">{numericQuantity}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">Quantity</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
+                            {[
+                              ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
+                              ['Section', {
+                                square: 'Square Pipe',
+                                square_heavy: 'Heavy Square Pipe',
+                                round: 'Round Pipe',
+                                angle: 'Angle Iron',
+                                rod_8mm: '8mm Round Rod',
+                                rod_10mm: '10mm Round Rod',
+                                rod_12mm: '12mm Round Rod',
+                                sq_rod_8mm: '8mm Square Rod',
+                                sq_rod_10mm: '10mm Square Rod',
+                                sq_rod_12mm: '12mm Square Rod'
+                              }[profileType] || 'Standard Profile'],
+                              ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
+                              ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`]
+                            ].map(([label, value]) => (
+                              <div key={label} className="flex items-center justify-between">
+                                <span className="text-slate-400">{label}</span>
+                                <span className="font-medium text-slate-100">{value}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-6 space-y-3">
+                            <a
+                              href={buildQuoteWhatsAppUrl()}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
+                            >
+                              <WhatsAppIcon className="w-5 h-5" />
+                              Get this quote on WhatsApp
+                            </a>
+                            <button
+                              onClick={() => handleTabSwitch('contact')}
+                              className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
+                            >
+                              Send for Final Quote
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
+                            *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <div className="mt-6">
+                          <p className="text-sm text-slate-300 leading-relaxed">
+                            Get a practical budget for your grill, railing or gate in seconds — the same method our workshop uses.
+                          </p>
+                          <div className="mt-5 space-y-4">
+                            {[
+                              ['1', 'Enter width and height', 'Approximate size is enough — feet by default'],
+                              ['2', 'Pick work type and material', 'Window, balcony, gate… mild steel or SS 304'],
+                              ['3', 'Get your budget instantly', 'Send it to us on WhatsApp for the final quote']
+                            ].map(([step, title, sub]) => (
+                              <div key={step} className="flex items-start gap-3">
+                                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-accent-400 shrink-0">
+                                  {step}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-slate-100 text-sm">{title}</p>
+                                  <p className="text-xs text-slate-400">{sub}</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="mt-6 border-t border-white/10 pt-4 space-y-2">
+                            {['Transparent market-based rates', 'Free site measurement before final quote', 'Fabrication-grade weight calculation'].map((point) => (
+                              <p key={point} className="flex items-center gap-2 text-xs text-slate-300">
+                                <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                {point}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* ===== Inputs ===== */}
+                  <div className="order-1 lg:order-2 lg:col-span-3">
                 <Card variant="glass" className="backdrop-blur-sm">
-                  <CardContent className="p-4 sm:p-6 lg:p-8 xl:p-12">
+                  <CardContent className="p-4 sm:p-6 lg:p-8">
+                    <p className="text-sm font-medium text-steel-500 mb-1.5">Get your budget estimate using</p>
+                    <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-steel-900 mb-3">
+                      <span className="bg-accent-100 text-accent-700 px-2 py-0.5 rounded-lg">eMetal Calculator</span>
+                    </h3>
+                    <div className="p-3 bg-blue-50 rounded-lg mb-6">
+                      <p className="text-sm text-blue-800">
+                        <span className="font-medium">Quick estimate:</span> Feet is selected by default. Final quotation depends on site measurement, design, finish and installation.
+                      </p>
+                    </div>
                     {/* Dimensions with Unit Converter */}
                     <div className="mb-4">
-                      <p className="text-sm text-steel-600 text-center">
+                      <p className="text-sm text-steel-600">
                         <strong>Enter approximate dimensions:</strong> Width (horizontal) x Height (vertical)
                       </p>
                     </div>
@@ -1236,7 +1375,7 @@ export default function HomePage() {
                             <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Width
+                            <strong className="font-bold">Width</strong>
                           </span>
                         </label>
                         <div className="flex gap-2">
@@ -1271,7 +1410,7 @@ export default function HomePage() {
                             <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </svg>
-                            Height
+                            <strong className="font-bold">Height</strong>
                           </span>
                         </label>
                         <div className="flex gap-2">
@@ -1307,7 +1446,7 @@ export default function HomePage() {
 	                          <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
 	                          </svg>
-	                          Quantity
+	                          <strong className="font-bold">Quantity</strong>
 	                        </span>
 	                      </label>
 	                      <Input
@@ -1332,11 +1471,11 @@ export default function HomePage() {
 
                     {/* Grill Type Selection - Tiles */}
                     <div className="mb-8">
-                      <h3 className="text-lg font-semibold text-steel-900 mb-4 flex items-center gap-2">
+                      <h3 className="text-lg font-bold text-steel-900 mb-4 flex items-center gap-2">
                         <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                         </svg>
-                        What do you need?
+                        Pick your work type
                       </h3>
                       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                         {[
@@ -1386,7 +1525,7 @@ export default function HomePage() {
                             <svg className="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                             </svg>
-                            Material
+                            <strong className="font-bold">Material</strong>
                           </span>
                         </label>
                         <select
@@ -1405,150 +1544,10 @@ export default function HomePage() {
                     </div>
 
 
-                    {/* Results */}
-                    {(widthInCm > 0 && heightInCm > 0) && (
-                      <motion.div
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-gradient-to-r from-primary-50 to-accent-50 rounded-2xl p-6 sm:p-8 mb-6 sm:mb-8"
-                      >
-                        {/* Project Summary */}
-                        <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft mb-6">
-                          <h4 className="text-lg font-semibold text-steel-900 mb-4 text-center">Project Summary</h4>
-	                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                            <div className="text-center">
-                              <div className="font-medium text-steel-900">
-                                {metalType === 'steel' ? 'Mild Steel' :
-                                 metalType === 'stainless' ? 'Stainless Steel' :
-                                 metalType === 'aluminum' ? 'Aluminum' : 'Cast Iron'}
-                              </div>
-                              <div className="text-steel-500">Metal Type</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="font-medium text-steel-900">
-                                {{
-                                  square: 'Square Pipe',
-                                  square_heavy: 'Heavy Square Pipe',
-                                  round: 'Round Pipe',
-                                  angle: 'Angle Iron',
-                                  rod_8mm: '8mm Round Rod',
-                                  rod_10mm: '10mm Round Rod',
-                                  rod_12mm: '12mm Round Rod',
-                                  sq_rod_8mm: '8mm Square Rod',
-                                  sq_rod_10mm: '10mm Square Rod',
-                                  sq_rod_12mm: '12mm Square Rod'
-                                }[profileType] || 'Standard Profile'}
-                              </div>
-                              <div className="text-steel-500">Profile Type</div>
-                            </div>
-                            <div className="text-center">
-                              <div className="font-medium text-steel-900">
-                                {widthInCm.toFixed(1)} × {heightInCm.toFixed(1)} cm
-                              </div>
-                              <div className="text-steel-500">W × H (converted)</div>
-                            </div>
-	                            <div className="text-center">
-	                              <div className="font-medium text-steel-900">
-	                                {numericQuantity}
-	                              </div>
-	                              <div className="text-steel-500">Quantity</div>
-	                            </div>
-                            {showAdvancedCalculator ? (
-                              <>
-                                <div className="text-center">
-                                  <div className="font-medium text-steel-900">
-                                    {numberOfBars || 0} bars
-                                  </div>
-                                  <div className="text-steel-500">Number of Bars</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="font-medium text-steel-900">
-                                    {totalBarLength ? totalBarLength.toFixed(1) : 0} ft
-                                  </div>
-                                  <div className="text-steel-500">Total Bar Length</div>
-                                </div>
-                              </>
-                            ) : (
-                              <>
-                                <div className="text-center">
-                                  <div className="font-medium text-steel-900">
-                                    {(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)} meters
-                                  </div>
-                                  <div className="text-steel-500">Total Profile Length</div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="font-medium text-steel-900">
-                                    ₹{getMetalRate().toFixed(0)}/kg
-                                  </div>
-                                  <div className="text-steel-500">Rate</div>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Cost Breakdown */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 text-center">
-                          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft">
-                            <div className="text-2xl sm:text-3xl font-bold text-primary-600 mb-2">
-                              {Math.round(isNaN(weight) ? 0 : weight)} kg
-                            </div>
-                            <div className="text-steel-600 font-medium">Estimated Weight</div>
-                            <div className="text-xs text-steel-500 mt-1">
-                              Approximate fabrication weight based on selected work type and material.
-                            </div>
-                          </div>
-                          <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft">
-                            <div className="text-2xl sm:text-3xl font-bold text-accent-600 mb-2">
-                              ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
-                            </div>
-                            <div className="text-steel-600 font-medium">
-                              Budget Estimate
-                            </div>
-                            {grillAreaSqMeters > 0 && cost > 0 && (
-                              <div className="text-xs text-steel-500 mt-1">
-                                ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')} per sq.ft
-                              </div>
-                            )}
-                            <div className="text-xs text-steel-500 mt-1">
-                              Includes material, fabrication, finish and installation allowance
-                            </div>
-                            {minimumApplied && (
-                              <div className="text-xs text-amber-600 mt-1 font-medium">
-                                Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-center mt-4 sm:mt-6">
-                          <p className="text-sm text-steel-500 mb-4">
-                            *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
-                          </p>
-                          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <a
-                              href={buildQuoteWhatsAppUrl()}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto rounded-lg bg-[#25D366] px-5 py-3 font-semibold text-white shadow-soft hover:bg-[#1ebe5b] transition-colors"
-                            >
-                              <WhatsAppIcon className="w-5 h-5" />
-                              Get this quote on WhatsApp
-                            </a>
-                            <Button
-                              onClick={() => handleTabSwitch('contact')}
-                              variant="outline"
-                              className="w-full sm:w-auto"
-                            >
-                              Send for Final Quote
-                            </Button>
-                          </div>
-                        </div>
-                      </motion.div>
-                    )}
                   </CardContent>
                 </Card>
+                  </div>
+                </div>
               </motion.div>
             )}
 

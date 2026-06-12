@@ -10,3 +10,5 @@ dist/
 # Local dev logs
 server-dev.log
 vite-dev.log
+playwright-*.log
+pw-spot*.log

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Contact Form Scenarios', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
     // Click on the Contact Us tab
     await page.click('button:has-text("Contact Us")');
   });
@@ -25,7 +25,7 @@ test.describe('Contact Form Scenarios', () => {
     await page.click('button:has-text("Send Message")');
 
     // Wait for the error message or form state to change
-    await expect(page.locator('text=Message must be at least 2 characters long.')).toBeVisible({ timeout: 5000 });
+    await expect(page.locator('text=Message must be at least 10 characters.')).toBeVisible({ timeout: 5000 });
   });
 
   test('should successfully submit valid form', async ({ page }) => {

@@ -27,7 +27,7 @@ const contactSchema = Joi.object({
     estimatedWeight: Joi.number().min(0).optional(),
     estimatedCost: Joi.number().min(0).optional(),
     calculatorType: Joi.string().valid('standard', 'advanced', 'rod_based').optional()
-  }).unknown(true).optional(),
+  }).unknown(true).allow(null).optional(),
   sessionId: Joi.string().required(),
   visitorId: Joi.string().required(),
   source: Joi.string().valid('website_contact', 'calculator_quote', 'service_inquiry', 'direct').optional()

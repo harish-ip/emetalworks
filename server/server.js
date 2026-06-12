@@ -69,7 +69,11 @@ const limiter = rateLimit({
   message: {
     error: 'Too many requests from this IP, please try again later.'
   },
-  skip: (req) => req.originalUrl.startsWith('/api/analytics')
+  // GET /api/pricing is fetched on every page load (like analytics), so it
+  // must not consume the budget that protects real user actions either.
+  skip: (req) =>
+    req.originalUrl.startsWith('/api/analytics') ||
+    (req.method === 'GET' && req.originalUrl.startsWith('/api/pricing'))
 });
 app.use('/api/', limiter);
 

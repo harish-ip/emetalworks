@@ -2,23 +2,25 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Admin Dashboard Scenarios', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/admin');
+    await page.goto('/admin', { waitUntil: 'domcontentloaded' });
   });
 
   test('should fail login with wrong credentials', async ({ page }) => {
     await page.fill('input[placeholder="Username"]', 'wronguser');
     await page.fill('input[placeholder="Password"]', 'wrongpass');
-    await page.click('button:has-text("Login")');
+    await page.click('button:has-text("Sign In")');
 
-    await expect(page.locator('text=Invalid credentials')).toBeVisible();
+    await expect(page.locator('text=Invalid credentials')).toBeVisible({ timeout: 10000 });
   });
 
   test('should login with correct credentials', async ({ page }) => {
     await page.fill('input[placeholder="Username"]', 'admin');
     await page.fill('input[placeholder="Password"]', 'admin123');
-    await page.click('button:has-text("Login")');
+    await page.click('button:has-text("Sign In")');
 
-    await expect(page.locator('text=Logout')).toBeVisible();
+    // Logout exists in both the desktop sidebar and the mobile top bar —
+    // assert that whichever applies to this viewport is visible.
+    await expect(page.locator('button:has-text("Logout") >> visible=true').first()).toBeVisible({ timeout: 10000 });
     await expect(page.locator('text=Recent Contacts')).toBeVisible({ timeout: 10000 });
   });
 });
@@ -94,11 +96,12 @@ async function mockAdminApi(page, contacts = sampleContacts) {
 
 async function loginAndOpenContacts(page) {
   await mockAdminApi(page);
-  await page.goto('/admin');
+  await page.goto('/admin', { waitUntil: 'domcontentloaded' });
   await page.fill('input[placeholder="Username"]', 'admin');
   await page.fill('input[placeholder="Password"]', 'admin123');
-  await page.click('button:has-text("Login")');
-  await page.click('button:has-text("Contacts")');
+  await page.click('button:has-text("Sign In")');
+  // Nav exists twice (desktop sidebar + mobile pills) — click the visible one
+  await page.locator('button:has-text("Contacts") >> visible=true').first().click();
   await expect(page.locator('text=Contact Management')).toBeVisible();
 }
 
@@ -162,7 +165,7 @@ test.describe('Contact Management Table', () => {
     await page.fill('textarea[placeholder="Enter remark..."]', 'Follow up Monday');
     await page.click('button:has-text("Save Remark")');
 
-    await expect.poll(() => noteBody).not.toBeNull();
+    await expect.poll(() => noteBody, { timeout: 10000 }).not.toBeNull();
     expect(noteBody.note).toBe('Follow up Monday');
   });
 
