@@ -25,6 +25,6 @@ test.describe('Calculator Scenarios', () => {
     // Total should update automatically. Wait for calculation.
     // Ensure the estimated weight and cost are not zero
     await expect(page.locator('text=Estimated Weight').locator('..').locator('div.text-primary-600')).not.toHaveText('0 kg', { timeout: 5000 });
-    await expect(page.locator('text=Estimated Cost').locator('..').locator('div.text-accent-600')).not.toHaveText('₹0');
+    await expect(page.locator('text=Budget Estimate').locator('..').locator('div.text-accent-600')).not.toHaveText('₹0*');
   });
 });

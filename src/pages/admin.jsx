@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardTitle } from '../components/ui/card.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
+import { DEFAULT_PRICING, fetchPricing, savePricing } from '../utils/pricing.js';
 
 const resolveApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -104,44 +105,62 @@ const toDateInput = (value) => {
   return isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
 };
 
-const QUOTE_CONFIG = {
-  materialRates: {
-    steel: 68,
-    stainless: 275
-  },
-  fabricationRates: {
-    steel: 105,
-    stainless: 160
-  },
-  finishingRates: {
-    steel: 45,
-    stainless: 20
-  },
-  installationRates: {
-    window: 55,
-    security: 70,
-    decorative: 85,
-    balcony: 95,
-    gate: 120,
-    staircase: 120
-  },
-  complexity: {
-    window: 1,
-    security: 1.3,
-    decorative: 1.5,
-    balcony: 1.2,
-    gate: 1.4,
-    staircase: 1.6
-  },
-  profileWeights: {
-    rod_8mm: 0.39,
-    rod_10mm: 0.62,
-    rod_12mm: 0.89,
-    square: 1.15,
-    round: 0.89,
-    angle: 1.12
-  }
+// kg per linear meter for each profile. Square rods are the practical choice
+// for window/security grills; round rod kept for old-style work.
+const PROFILE_WEIGHTS = {
+  sq_rod_8mm: 0.50,    // 8mm square rod (d² × 0.00785)
+  sq_rod_10mm: 0.79,   // 10mm square rod
+  sq_rod_12mm: 1.13,   // 12mm square rod
+  rod_8mm: 0.39,       // 8mm round rod (d² × 0.006165)
+  rod_10mm: 0.62,      // 10mm round rod
+  rod_12mm: 0.89,      // 12mm round rod
+  square: 1.15,        // 20x20x2mm square pipe
+  round: 0.89,         // 20mm dia x 2mm round pipe
+  angle: 1.12,         // 25x25x3mm angle
+  square_heavy: 3.0    // 40x40x2.6mm square pipe (gates)
 };
+
+const PROFILE_LABELS = {
+  sq_rod_8mm: '8mm Square Rod',
+  sq_rod_10mm: '10mm Square Rod',
+  sq_rod_12mm: '12mm Square Rod',
+  rod_8mm: '8mm Round Rod',
+  rod_10mm: '10mm Round Rod',
+  rod_12mm: '12mm Round Rod',
+  square: '20x20x2mm Square Pipe',
+  round: '20mm Round Pipe',
+  angle: '25x25x3mm Angle',
+  square_heavy: '40x40x2.6mm Heavy Square Pipe'
+};
+
+const DEFAULT_PROFILE_BY_WORK = {
+  window: 'sq_rod_10mm',
+  security: 'sq_rod_12mm',
+  decorative: 'square',
+  balcony: 'square',
+  gate: 'square_heavy',
+  staircase: 'round'
+};
+
+const WORK_TYPE_LABELS = {
+  window: 'Window Grills',
+  security: 'Security Grills',
+  decorative: 'Decorative Grills',
+  balcony: 'Balcony Railings',
+  gate: 'Gate Grills',
+  staircase: 'Staircase Railings'
+};
+
+// Pricing object -> editable string draft for the settings form
+const pricingToDraft = (p) => ({
+  metalRates: { steel: String(p.metalRates.steel), stainless: String(p.metalRates.stainless) },
+  fabricationRates: { steel: String(p.fabricationRates.steel), stainless: String(p.fabricationRates.stainless) },
+  finishingRates: { steel: String(p.finishingRates.steel), stainless: String(p.finishingRates.stainless) },
+  installationRates: Object.fromEntries(Object.entries(p.installationRates).map(([k, v]) => [k, String(v)])),
+  grillComplexity: Object.fromEntries(Object.entries(p.grillComplexity).map(([k, v]) => [k, String(v)])),
+  wastagePercent: String(p.wastagePercent),
+  minimumCharge: String(p.minimumCharge)
+});
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -208,35 +227,117 @@ export default function AdminDashboard() {
     width: '4',
     height: '4',
     quantity: '1',
-    profile: 'rod_10mm',
+    profile: 'sq_rod_10mm',
     spacing: '4',
+    hSpacing: '24',
     wastage: '7',
     finishingRate: '45',
     installRate: '55',
-    extraCost: '0',
-    minimumCharge: '2500'
+    extraCost: '0'
   });
+
+  // Centralized pricing — same rates the public website calculator uses.
+  const [pricing, setPricing] = useState(DEFAULT_PRICING);
+  const [pricingDraft, setPricingDraft] = useState(pricingToDraft(DEFAULT_PRICING));
+  const [pricingMeta, setPricingMeta] = useState(null); // { updatedAt }
+  const [pricingSaving, setPricingSaving] = useState(false);
+  const [pricingStatus, setPricingStatus] = useState(null); // { type, message }
+  const [quoteCopied, setQuoteCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPricing()
+      .then((serverPricing) => {
+        if (cancelled) return;
+        setPricing(serverPricing);
+        setPricingDraft(pricingToDraft(serverPricing));
+        if (serverPricing.updatedAt) setPricingMeta({ updatedAt: serverPricing.updatedAt });
+      })
+      .catch(() => {
+        // Defaults stay in place; the settings form will still render
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Keep the per-quote rate fields in step with central pricing
+  useEffect(() => {
+    setQuoteForm((prev) => ({
+      ...prev,
+      finishingRate: String(pricing.finishingRates[prev.material] ?? prev.finishingRate),
+      installRate: String(pricing.installationRates[prev.workType] ?? prev.installRate),
+      wastage: String(pricing.wastagePercent ?? prev.wastage)
+    }));
+  }, [pricing]);
+
+  const handleQuoteWorkTypeChange = (workType) => {
+    setQuoteForm((prev) => ({
+      ...prev,
+      workType,
+      profile: DEFAULT_PROFILE_BY_WORK[workType] || prev.profile,
+      installRate: String(pricing.installationRates[workType] ?? prev.installRate)
+    }));
+  };
+
+  const handleQuoteMaterialChange = (material) => {
+    setQuoteForm((prev) => ({
+      ...prev,
+      material,
+      finishingRate: String(pricing.finishingRates[material] ?? prev.finishingRate)
+    }));
+  };
+
+  const setDraftRate = (group, key, value) => {
+    setPricingStatus(null);
+    setPricingDraft((prev) => ({
+      ...prev,
+      [group]: { ...prev[group], [key]: value }
+    }));
+  };
+
+  const setDraftField = (key, value) => {
+    setPricingStatus(null);
+    setPricingDraft((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSavePricing = async () => {
+    setPricingSaving(true);
+    setPricingStatus(null);
+    try {
+      const saved = await savePricing(pricingDraft, localStorage.getItem('admin_token'));
+      setPricing(saved);
+      setPricingDraft(pricingToDraft(saved));
+      if (saved.updatedAt) setPricingMeta({ updatedAt: saved.updatedAt });
+      setPricingStatus({ type: 'success', message: 'Saved. The website calculator now uses these rates.' });
+    } catch (error) {
+      setPricingStatus({ type: 'error', message: error.message || 'Failed to save pricing.' });
+    } finally {
+      setPricingSaving(false);
+    }
+  };
 
   const calculateAdminQuote = () => {
     const width = parseFloat(quoteForm.width) || 0;
     const height = parseFloat(quoteForm.height) || 0;
-    const quantity = parseInt(quoteForm.quantity, 10) || 1;
+    const quantity = Math.max(1, parseInt(quoteForm.quantity, 10) || 1);
     const areaSqFt = width * height * quantity;
-    const profileWeight = QUOTE_CONFIG.profileWeights[quoteForm.profile] || 1.15;
-    const materialRate = QUOTE_CONFIG.materialRates[quoteForm.material] || 68;
-    const fabricationRate = QUOTE_CONFIG.fabricationRates[quoteForm.material] || 105;
-    const complexity = QUOTE_CONFIG.complexity[quoteForm.workType] || 1;
+    const profileWeight = PROFILE_WEIGHTS[quoteForm.profile] || 1.15;
+    const materialRate = pricing.metalRates[quoteForm.material] || 68;
+    const fabricationRate = pricing.fabricationRates[quoteForm.material] || 105;
+    const complexity = pricing.grillComplexity[quoteForm.workType] || 1;
     const wastagePercent = parseFloat(quoteForm.wastage) || 0;
     const finishingRate = parseFloat(quoteForm.finishingRate) || 0;
     const installRate = parseFloat(quoteForm.installRate) || 0;
     const extraCost = parseFloat(quoteForm.extraCost) || 0;
-    const minimumCharge = parseFloat(quoteForm.minimumCharge) || 0;
+    // Minimum job charge comes from central Pricing Settings — not per quote
+    const minimumCharge = Number(pricing.minimumCharge) || 0;
 
     let linearMeters = 0;
+    let verticalBars = 0;
+    let horizontalBars = 0;
 
     if (quoteForm.workType === 'window') {
-      const verticalBars = Math.max(2, Math.ceil((width * 12) / (parseFloat(quoteForm.spacing) || 4)));
-      const horizontalBars = Math.max(3, Math.ceil((height * 12) / 12));
+      verticalBars = Math.max(2, Math.ceil((width * 12) / (parseFloat(quoteForm.spacing) || 4)));
+      horizontalBars = Math.max(2, Math.ceil((height * 12) / (parseFloat(quoteForm.hSpacing) || 24)));
       const rodLengthFt = (verticalBars * height + horizontalBars * width) * quantity;
       const frameLengthFt = 2 * (width + height) * quantity;
       linearMeters = (rodLengthFt + frameLengthFt) * 0.3048;
@@ -264,6 +365,8 @@ export default function AdminDashboard() {
     return {
       areaSqFt,
       linearMeters,
+      verticalBars,
+      horizontalBars,
       totalWeight,
       materialCost,
       fabricationCost,
@@ -271,11 +374,40 @@ export default function AdminDashboard() {
       installationCost,
       extraCost,
       subtotal,
-      total
+      total,
+      minimumApplied: subtotal > 0 && subtotal < minimumCharge,
+      ratePerSqFt: areaSqFt > 0 ? total / areaSqFt : 0,
+      ratePerKg: totalWeight > 0 ? total / totalWeight : 0
     };
   };
 
   const adminQuote = calculateAdminQuote();
+
+  // WhatsApp-ready quote message the owner can paste straight to a customer
+  const buildAdminQuoteText = () => {
+    const lines = [
+      'eMetalWorks - Quotation',
+      `Work: ${WORK_TYPE_LABELS[quoteForm.workType] || quoteForm.workType}`,
+      `Material: ${quoteForm.material === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'}`,
+      `Section: ${PROFILE_LABELS[quoteForm.profile] || quoteForm.profile}`,
+      `Size: ${quoteForm.width}ft x ${quoteForm.height}ft, Qty: ${quoteForm.quantity}`,
+      `Approx. weight: ${Math.round(adminQuote.totalWeight)} kg`,
+      `Total: Rs ${Math.round(adminQuote.total).toLocaleString('en-IN')} (≈ Rs ${Math.round(adminQuote.ratePerSqFt)}/sq.ft)`,
+      'Includes material, fabrication, finishing and installation. Excludes GST.',
+      'Final price after site measurement.'
+    ];
+    return lines.join('\n');
+  };
+
+  const handleCopyQuote = async () => {
+    try {
+      await navigator.clipboard.writeText(buildAdminQuoteText());
+      setQuoteCopied(true);
+      setTimeout(() => setQuoteCopied(false), 2000);
+    } catch (error) {
+      window.prompt('Copy the quote below:', buildAdminQuoteText());
+    }
+  };
 
   // Check if already authenticated
   useEffect(() => {
@@ -547,10 +679,17 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-steel-50 to-steel-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6">
-            <CardTitle className="text-center mb-6">Admin Login</CardTitle>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <div className="w-16 h-16 mx-auto rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-extrabold text-2xl shadow-xl mb-4">
+              eM
+            </div>
+            <h1 className="text-2xl font-bold text-white">eMetalWorks</h1>
+            <p className="text-sm text-slate-400 mt-1">Owner Console</p>
+          </div>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8">
+            <h2 className="text-lg font-bold text-slate-900 mb-5">Sign in to continue</h2>
             <form onSubmit={handleLogin} className="space-y-4">
               <Input
                 type="text"
@@ -567,115 +706,180 @@ export default function AdminDashboard() {
                 required
               />
               {error && (
-                <div className="text-red-600 text-sm text-center">{error}</div>
+                <div className="bg-red-50 border border-red-200 text-red-700 text-sm text-center rounded-xl px-3 py-2">{error}</div>
               )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Logging in...' : 'Login'}
+                {loading ? 'Signing in…' : 'Sign In'}
               </Button>
             </form>
-          </CardContent>
-        </Card>
+          </div>
+          <p className="text-center text-xs text-slate-500 mt-6">Hyderabad · Window Grills · Balcony Railings · Gates</p>
+        </div>
       </div>
     );
   }
 
   // FULL DASHBOARD INTERFACE
+  const navItems = [
+    {
+      key: 'dashboard',
+      label: 'Dashboard',
+      onSelect: () => { setActiveView('dashboard'); loadDashboardData(); },
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v2a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM14 11a1 1 0 011-1h4a1 1 0 011 1v8a1 1 0 01-1 1h-4a1 1 0 01-1-1v-8zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3z" />
+        </svg>
+      )
+    },
+    {
+      key: 'contacts',
+      label: 'Leads & Contacts',
+      onSelect: () => { setActiveView('contacts'); loadContacts(); },
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      )
+    },
+    {
+      key: 'analytics',
+      label: 'Analytics',
+      onSelect: () => { setActiveView('analytics'); loadDashboardData(); },
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6m4 6V9m4 10V5M5 19h16" />
+        </svg>
+      )
+    },
+    {
+      key: 'quotation',
+      label: 'Quotes & Pricing',
+      onSelect: () => setActiveView('quotation'),
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+      )
+    }
+  ];
+  const activeNavItem = navItems.find((item) => item.key === activeView) || navItems[0];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-steel-50 to-steel-100 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-8 gap-4">
-          <div className="flex items-center gap-4">
-            <h1 className="text-3xl font-bold text-steel-900">eMetalWorks Admin</h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/')}
-              className="text-sm"
-            >
-              ← Back to Site
-            </Button>
+    <div className="min-h-screen bg-slate-100 flex">
+      {/* Sidebar (desktop) */}
+      <aside className="hidden lg:flex w-64 flex-col fixed inset-y-0 z-40 bg-slate-900">
+        <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-800">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-extrabold text-lg shadow-lg">
+            eM
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                localStorage.removeItem('admin_token');
-                setIsAuthenticated(false);
-                setActiveView('dashboard');
-                setDashboardData(null);
-                setContacts([]);
-              }}
-              className="text-sm text-red-600 hover:text-red-700 hover:bg-red-50"
-            >
-              🚪 Logout
-            </Button>
+          <div>
+            <p className="text-white font-bold leading-tight">eMetalWorks</p>
+            <p className="text-xs text-slate-400">Owner Console</p>
           </div>
-
         </div>
 
-        {/* Navigation Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
-          <Button
-            variant={activeView === 'dashboard' ? 'primary' : 'outline'}
-            onClick={() => {
-              setActiveView('dashboard');
-              loadDashboardData(); // Refresh data when switching to dashboard
-            }}
-            className="flex items-center gap-2"
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          {navItems.map((item) => (
+            <button
+              key={item.key}
+              onClick={item.onSelect}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                activeView === item.key
+                  ? 'bg-primary-600 text-white shadow-md'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+        </nav>
+
+        <div className="px-3 py-4 border-t border-slate-800 space-y-1">
+          <button
+            onClick={() => navigate('/')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
           >
-            📊 Dashboard
-          </Button>
-          <Button
-            variant={activeView === 'contacts' ? 'primary' : 'outline'}
-            onClick={() => {
-              setActiveView('contacts');
-              loadContacts(); // Refresh contacts when switching to contacts view
-            }}
-            className="flex items-center gap-2"
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+            </svg>
+            Back to Website
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
           >
-            📋 Contacts
-          </Button>
-          <Button
-            variant={activeView === 'analytics' ? 'primary' : 'outline'}
-            onClick={() => {
-              setActiveView('analytics');
-              loadDashboardData(); // Refresh data when switching to analytics
-            }}
-            className="flex items-center gap-2"
-          >
-            📈 Analytics
-          </Button>
-          <Button
-            variant={activeView === 'quotation' ? 'primary' : 'outline'}
-            onClick={() => setActiveView('quotation')}
-            className="flex items-center gap-2"
-          >
-            Quotation Ref
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => {
-              loadDashboardData();
-              loadContacts();
-            }}
-            className="flex items-center gap-2 text-green-600 hover:text-green-700"
-            title="Refresh all data"
-          >
-            🔄 Refresh
-          </Button>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            Logout
+          </button>
         </div>
+      </aside>
+
+      {/* Main column */}
+      <div className="flex-1 min-w-0 lg:pl-64 flex flex-col">
+        {/* Top bar */}
+        <header className="sticky top-0 z-30 bg-white/90 backdrop-blur border-b border-slate-200">
+          <div className="px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="lg:hidden w-9 h-9 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white font-extrabold shrink-0">
+                eM
+              </div>
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">{activeNavItem.label}</h1>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => { loadDashboardData(); loadContacts(); }}
+                title="Refresh all data"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="hidden sm:inline">Refresh</span>
+              </button>
+              <button
+                onClick={handleLogout}
+                className="lg:hidden inline-flex items-center rounded-xl border border-red-200 bg-white px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+          {/* Mobile nav pills */}
+          <div className="lg:hidden px-4 pb-3 flex gap-2 overflow-x-auto">
+            {navItems.map((item) => (
+              <button
+                key={item.key}
+                onClick={item.onSelect}
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                  activeView === item.key
+                    ? 'bg-primary-600 text-white shadow'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
+          <div className="max-w-7xl mx-auto w-full">
 
         {loading && (
-          <div className="text-center py-8">
-            <div className="text-steel-600">Loading...</div>
+          <div className="flex items-center justify-center gap-3 py-8 text-slate-500">
+            <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            Loading…
           </div>
         )}
 
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl mb-4">
             {error}
           </div>
         )}
@@ -683,35 +887,64 @@ export default function AdminDashboard() {
         {/* Dashboard View */}
         {activeView === 'dashboard' && !dashboardData && !loading && (
           <div className="text-center py-8">
-            <div className="text-steel-600">No dashboard data available. Click "📊 Dashboard" to reload.</div>
+            <div className="text-slate-500">No dashboard data available. Press Refresh to reload.</div>
           </div>
         )}
         {activeView === 'dashboard' && dashboardData && (
           <div className="space-y-6">
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-steel-600">Total Visits</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.totalVisits}</p>
-                    </div>
-                    <div className="text-blue-600">👥</div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              {[
+                {
+                  label: 'Total Visits',
+                  value: dashboardData.totalVisits,
+                  chip: 'from-sky-500 to-blue-600',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  )
+                },
+                {
+                  label: 'Visits Today',
+                  value: dashboardData.hitsToday,
+                  chip: 'from-emerald-500 to-green-600',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  )
+                },
+                {
+                  label: 'Calculator Visits',
+                  value: dashboardData.calculatorPageVisits,
+                  chip: 'from-violet-500 to-purple-600',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  )
+                },
+                {
+                  label: 'Quote Leads',
+                  value: (dashboardData.calculatorLeads || []).length,
+                  chip: 'from-amber-500 to-orange-600',
+                  icon: (
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  )
+                }
+              ].map((stat) => (
+                <div key={stat.label} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
+                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.chip} text-white flex items-center justify-center shadow-md mb-3`}>
+                    {stat.icon}
                   </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-steel-600">Calculator Page Visits</p>
-                      <p className="text-3xl font-bold text-steel-900">{dashboardData.calculatorPageVisits}</p>
-                    </div>
-                    <div className="text-green-600">📧</div>
-                  </div>
-                </CardContent>
-              </Card>
+                  <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">{stat.value ?? 0}</p>
+                  <p className="text-sm font-medium text-slate-500 mt-1.5">{stat.label}</p>
+                </div>
+              ))}
             </div>
 
             {/* Recent Contacts */}
@@ -1407,109 +1640,300 @@ export default function AdminDashboard() {
 
         {activeView === 'quotation' && (
           <div className="space-y-6">
+            {/* ===== Quote Builder: form left, live summary right ===== */}
+            <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
+              <div className="xl:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="px-6 py-5 border-b border-slate-100 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 text-white flex items-center justify-center shadow-md">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900">Quote Builder</h3>
+                    <p className="text-sm text-slate-500">Practical fabrication quote using your saved central rates</p>
+                  </div>
+                </div>
+
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Job Details</h4>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="col-span-2 lg:col-span-1">
+                        <label className="block text-sm font-medium text-steel-700 mb-2">Work Type</label>
+                        <select
+                          value={quoteForm.workType}
+                          onChange={(e) => handleQuoteWorkTypeChange(e.target.value)}
+                          className="w-full px-3 py-3 border border-steel-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                          <option value="window">Window Grills</option>
+                          <option value="security">Security Grills</option>
+                          <option value="decorative">Decorative Grills</option>
+                          <option value="balcony">Balcony Railings</option>
+                          <option value="gate">Gate Grills</option>
+                          <option value="staircase">Staircase Railings</option>
+                        </select>
+                      </div>
+                      <div className="col-span-2 lg:col-span-1">
+                        <label className="block text-sm font-medium text-steel-700 mb-2">Material</label>
+                        <select
+                          value={quoteForm.material}
+                          onChange={(e) => handleQuoteMaterialChange(e.target.value)}
+                          className="w-full px-3 py-3 border border-steel-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                          <option value="steel">Mild Steel</option>
+                          <option value="stainless">Stainless Steel 304</option>
+                        </select>
+                      </div>
+                      <Input label="Width (ft)" type="number" step="0.1" value={quoteForm.width} onChange={(e) => setQuoteForm({ ...quoteForm, width: e.target.value })} />
+                      <Input label="Height (ft)" type="number" step="0.1" value={quoteForm.height} onChange={(e) => setQuoteForm({ ...quoteForm, height: e.target.value })} />
+                      <Input label="Quantity" type="number" min="1" value={quoteForm.quantity} onChange={(e) => setQuoteForm({ ...quoteForm, quantity: e.target.value })} />
+                      <div className="col-span-2 lg:col-span-3">
+                        <label className="block text-sm font-medium text-steel-700 mb-2">Section / Profile</label>
+                        <select
+                          value={quoteForm.profile}
+                          onChange={(e) => setQuoteForm({ ...quoteForm, profile: e.target.value })}
+                          className="w-full px-3 py-3 border border-steel-300 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                        >
+                          <optgroup label="Square Rods (standard for grills)">
+                            <option value="sq_rod_8mm">8mm Square Rod ({PROFILE_WEIGHTS.sq_rod_8mm} kg/m)</option>
+                            <option value="sq_rod_10mm">10mm Square Rod ({PROFILE_WEIGHTS.sq_rod_10mm} kg/m)</option>
+                            <option value="sq_rod_12mm">12mm Square Rod ({PROFILE_WEIGHTS.sq_rod_12mm} kg/m)</option>
+                          </optgroup>
+                          <optgroup label="Round Rods (old-style)">
+                            <option value="rod_8mm">8mm Round Rod ({PROFILE_WEIGHTS.rod_8mm} kg/m)</option>
+                            <option value="rod_10mm">10mm Round Rod ({PROFILE_WEIGHTS.rod_10mm} kg/m)</option>
+                            <option value="rod_12mm">12mm Round Rod ({PROFILE_WEIGHTS.rod_12mm} kg/m)</option>
+                          </optgroup>
+                          <optgroup label="Pipes / Sections">
+                            <option value="square">20x20x2mm Square Pipe ({PROFILE_WEIGHTS.square} kg/m)</option>
+                            <option value="round">20mm Round Pipe ({PROFILE_WEIGHTS.round} kg/m)</option>
+                            <option value="angle">25x25x3mm Angle ({PROFILE_WEIGHTS.angle} kg/m)</option>
+                            <option value="square_heavy">40x40x2.6mm Heavy Square Pipe ({PROFILE_WEIGHTS.square_heavy} kg/m)</option>
+                          </optgroup>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3">Fabrication Settings</h4>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {quoteForm.workType === 'window' && (
+                        <>
+                          <Input label="Vertical Bar Gap (in)" type="number" step="0.5" value={quoteForm.spacing} onChange={(e) => setQuoteForm({ ...quoteForm, spacing: e.target.value })} />
+                          <Input label="Horizontal Bar Gap (in)" type="number" step="1" value={quoteForm.hSpacing} onChange={(e) => setQuoteForm({ ...quoteForm, hSpacing: e.target.value })} />
+                        </>
+                      )}
+                      <Input label="Wastage (%)" type="number" step="1" value={quoteForm.wastage} onChange={(e) => setQuoteForm({ ...quoteForm, wastage: e.target.value })} />
+                      <Input label="Finish Rate (₹/sq.ft)" type="number" step="5" value={quoteForm.finishingRate} onChange={(e) => setQuoteForm({ ...quoteForm, finishingRate: e.target.value })} />
+                      <Input label="Install Rate (₹/sq.ft)" type="number" step="5" value={quoteForm.installRate} onChange={(e) => setQuoteForm({ ...quoteForm, installRate: e.target.value })} />
+                      <Input label="Extra: hinges, lock, transport (₹)" type="number" step="100" value={quoteForm.extraCost} onChange={(e) => setQuoteForm({ ...quoteForm, extraCost: e.target.value })} />
+                    </div>
+                  </div>
+
+                  {quoteForm.workType === 'window' && (
+                    <div className="flex items-start gap-3 rounded-xl bg-primary-50 border border-primary-100 p-4">
+                      <svg className="w-5 h-5 text-primary-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm text-primary-900">
+                        Bar layout per unit: <strong>{adminQuote.verticalBars} vertical + {adminQuote.horizontalBars} horizontal</strong> {PROFILE_LABELS[quoteForm.profile] || quoteForm.profile} bars, plus angle frame on all four sides.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Live summary panel */}
+              <div className="xl:col-span-2 xl:sticky xl:top-20 space-y-4">
+                <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 p-6 text-white shadow-xl">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-slate-300">Final Quote</p>
+                    <span className="text-xs px-2 py-1 rounded-full bg-white/10 text-slate-200">
+                      {WORK_TYPE_LABELS[quoteForm.workType]} · Qty {quoteForm.quantity || 1}
+                    </span>
+                  </div>
+                  <p className="text-4xl font-extrabold mt-2 tracking-tight">
+                    ₹{Math.round(adminQuote.total).toLocaleString('en-IN')}
+                  </p>
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
+                      ≈ ₹{Math.round(adminQuote.ratePerSqFt).toLocaleString('en-IN')}/sq.ft
+                    </span>
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-400/20 text-sky-300">
+                      ≈ ₹{Math.round(adminQuote.ratePerKg).toLocaleString('en-IN')}/kg
+                    </span>
+                  </div>
+                  {adminQuote.minimumApplied && (
+                    <p className="mt-3 text-xs font-medium text-amber-300">
+                      ⚠ Minimum job charge of ₹{Number(pricing.minimumCharge).toLocaleString('en-IN')} applied (from Pricing Settings)
+                    </p>
+                  )}
+                  <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                    {[
+                      ['Area', `${adminQuote.areaSqFt.toFixed(1)}`, 'sq.ft'],
+                      ['Weight', `${adminQuote.totalWeight.toFixed(1)}`, 'kg'],
+                      ['Length', `${adminQuote.linearMeters.toFixed(1)}`, 'm']
+                    ].map(([label, value, unit]) => (
+                      <div key={label} className="rounded-xl bg-white/10 p-3">
+                        <p className="text-lg font-bold leading-none">{value}</p>
+                        <p className="text-[11px] text-slate-300 mt-1">{unit} · {label}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
+                  <h4 className="text-sm font-bold text-slate-900 mb-2">Cost Breakdown</h4>
+                  {[
+                    ['Material', adminQuote.materialCost, 'bg-emerald-500'],
+                    ['Fabrication labour', adminQuote.fabricationCost, 'bg-blue-500'],
+                    ['Finishing', adminQuote.finishingCost, 'bg-violet-500'],
+                    ['Installation', adminQuote.installationCost, 'bg-amber-500'],
+                    ['Extra / fixtures', adminQuote.extraCost, 'bg-rose-500']
+                  ].map(([label, value, dot]) => (
+                    <div key={label} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                      <span className="flex items-center gap-2.5 text-sm text-slate-600">
+                        <span className={`w-2 h-2 rounded-full ${dot}`}></span>
+                        {label}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">₹{Math.round(value).toLocaleString('en-IN')}</span>
+                    </div>
+                  ))}
+                  <button
+                    onClick={handleCopyQuote}
+                    className={`mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white shadow-md transition-colors ${quoteCopied ? 'bg-emerald-600' : 'bg-[#25D366] hover:bg-[#1ebe5b]'}`}
+                  >
+                    {quoteCopied ? '✅ Copied!' : '📋 Copy Quote for WhatsApp'}
+                  </button>
+                  <p className="mt-3 text-xs text-slate-400">
+                    Sanity check: Hyderabad MS grills usually land around ₹200–320/sq.ft installed. If the rate is far outside that, re-check spacing, profile or rates.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <Card>
               <CardContent className="p-6">
-                <CardTitle className="mb-4">Advanced Quotation Calculator</CardTitle>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-steel-700 mb-2">Work Type</label>
-                    <select
-                      value={quoteForm.workType}
-                      onChange={(e) => setQuoteForm({ ...quoteForm, workType: e.target.value })}
-                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
-                    >
-                      <option value="window">Window Grills</option>
-                      <option value="security">Security Grills</option>
-                      <option value="decorative">Decorative Grills</option>
-                      <option value="balcony">Balcony Railings</option>
-                      <option value="gate">Gate Grills</option>
-                      <option value="staircase">Staircase Railings</option>
-                    </select>
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                  <CardTitle>Pricing Settings</CardTitle>
+                  {pricingMeta?.updatedAt && (
+                    <span className="text-xs text-steel-500">
+                      Last updated: {new Date(pricingMeta.updatedAt).toLocaleString('en-IN')}
+                    </span>
+                  )}
+                </div>
+                <p className="text-steel-600 mb-6 text-sm">
+                  These rates drive the <strong>public website calculator</strong> and the quote tool below.
+                  Update them when steel market rates or labour charges change, then press Save.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  <div className="rounded-lg border border-steel-200 p-4">
+                    <h4 className="font-semibold text-steel-900 mb-3">Material Rate (₹/kg)</h4>
+                    <div className="space-y-3">
+                      <Input label="Mild Steel" type="number" step="1" value={pricingDraft.metalRates.steel} onChange={(e) => setDraftRate('metalRates', 'steel', e.target.value)} />
+                      <Input label="Stainless Steel 304" type="number" step="5" value={pricingDraft.metalRates.stainless} onChange={(e) => setDraftRate('metalRates', 'stainless', e.target.value)} />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-steel-700 mb-2">Material</label>
-                    <select
-                      value={quoteForm.material}
-                      onChange={(e) => setQuoteForm({ ...quoteForm, material: e.target.value })}
-                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
-                    >
-                      <option value="steel">Mild Steel</option>
-                      <option value="stainless">Stainless Steel 304</option>
-                    </select>
+
+                  <div className="rounded-lg border border-steel-200 p-4">
+                    <h4 className="font-semibold text-steel-900 mb-3">Fabrication / Labour (₹/kg)</h4>
+                    <div className="space-y-3">
+                      <Input label="Mild Steel" type="number" step="5" value={pricingDraft.fabricationRates.steel} onChange={(e) => setDraftRate('fabricationRates', 'steel', e.target.value)} />
+                      <Input label="Stainless Steel 304" type="number" step="5" value={pricingDraft.fabricationRates.stainless} onChange={(e) => setDraftRate('fabricationRates', 'stainless', e.target.value)} />
+                    </div>
                   </div>
-                  <Input label="Width (ft)" type="number" step="0.1" value={quoteForm.width} onChange={(e) => setQuoteForm({ ...quoteForm, width: e.target.value })} />
-                  <Input label="Height (ft)" type="number" step="0.1" value={quoteForm.height} onChange={(e) => setQuoteForm({ ...quoteForm, height: e.target.value })} />
-                  <Input label="Quantity" type="number" min="1" value={quoteForm.quantity} onChange={(e) => setQuoteForm({ ...quoteForm, quantity: e.target.value })} />
-                  <div>
-                    <label className="block text-sm font-medium text-steel-700 mb-2">Profile</label>
-                    <select
-                      value={quoteForm.profile}
-                      onChange={(e) => setQuoteForm({ ...quoteForm, profile: e.target.value })}
-                      className="w-full px-3 py-2 border border-steel-300 rounded-lg bg-white"
-                    >
-                      <option value="rod_8mm">8mm Round Rod</option>
-                      <option value="rod_10mm">10mm Round Rod</option>
-                      <option value="rod_12mm">12mm Round Rod</option>
-                      <option value="square">20x20x2mm Square Pipe</option>
-                      <option value="round">20mm Round Pipe</option>
-                      <option value="angle">25x25x3mm Angle</option>
-                    </select>
+
+                  <div className="rounded-lg border border-steel-200 p-4">
+                    <h4 className="font-semibold text-steel-900 mb-3">Finishing (₹/sq.ft)</h4>
+                    <div className="space-y-3">
+                      <Input label="Mild Steel (paint)" type="number" step="5" value={pricingDraft.finishingRates.steel} onChange={(e) => setDraftRate('finishingRates', 'steel', e.target.value)} />
+                      <Input label="Stainless Steel (polish)" type="number" step="5" value={pricingDraft.finishingRates.stainless} onChange={(e) => setDraftRate('finishingRates', 'stainless', e.target.value)} />
+                    </div>
                   </div>
-                  <Input label="Bar Spacing (in)" type="number" step="0.5" value={quoteForm.spacing} onChange={(e) => setQuoteForm({ ...quoteForm, spacing: e.target.value })} />
-                  <Input label="Wastage (%)" type="number" step="1" value={quoteForm.wastage} onChange={(e) => setQuoteForm({ ...quoteForm, wastage: e.target.value })} />
-                  <Input label="Finish Rate (Rs/sq.ft)" type="number" step="5" value={quoteForm.finishingRate} onChange={(e) => setQuoteForm({ ...quoteForm, finishingRate: e.target.value })} />
-                  <Input label="Install Rate (Rs/sq.ft)" type="number" step="5" value={quoteForm.installRate} onChange={(e) => setQuoteForm({ ...quoteForm, installRate: e.target.value })} />
-                  <Input label="Extra Cost (Rs)" type="number" step="100" value={quoteForm.extraCost} onChange={(e) => setQuoteForm({ ...quoteForm, extraCost: e.target.value })} />
-                  <Input label="Minimum Charge (Rs)" type="number" step="100" value={quoteForm.minimumCharge} onChange={(e) => setQuoteForm({ ...quoteForm, minimumCharge: e.target.value })} />
+
+                  <div className="rounded-lg border border-steel-200 p-4 lg:col-span-2">
+                    <h4 className="font-semibold text-steel-900 mb-3">Installation (₹/sq.ft)</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {Object.keys(pricingDraft.installationRates).map((workType) => (
+                        <Input
+                          key={workType}
+                          label={WORK_TYPE_LABELS[workType] || workType}
+                          type="number"
+                          step="5"
+                          value={pricingDraft.installationRates[workType]}
+                          onChange={(e) => setDraftRate('installationRates', workType, e.target.value)}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-steel-200 p-4">
+                    <h4 className="font-semibold text-steel-900 mb-3">General</h4>
+                    <div className="space-y-3">
+                      <Input label="Wastage (%)" type="number" step="1" value={pricingDraft.wastagePercent} onChange={(e) => setDraftField('wastagePercent', e.target.value)} />
+                      <Input label="Minimum Job Charge (₹)" type="number" step="100" value={pricingDraft.minimumCharge} onChange={(e) => setDraftField('minimumCharge', e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-steel-200 p-4 lg:col-span-3">
+                    <h4 className="font-semibold text-steel-900 mb-3">Work Difficulty Multiplier (on fabrication ₹/kg)</h4>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                      {Object.keys(pricingDraft.grillComplexity).map((workType) => (
+                        <Input
+                          key={workType}
+                          label={WORK_TYPE_LABELS[workType] || workType}
+                          type="number"
+                          step="0.1"
+                          value={pricingDraft.grillComplexity[workType]}
+                          onChange={(e) => setDraftRate('grillComplexity', workType, e.target.value)}
+                        />
+                      ))}
+                    </div>
+                    <p className="text-xs text-steel-500 mt-2">
+                      Example: 1.3 means fabrication labour is charged 30% extra for that work type.
+                    </p>
+                  </div>
                 </div>
 
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {[
-                    ['Area', `${adminQuote.areaSqFt.toFixed(1)} sq.ft`],
-                    ['Linear Length', `${adminQuote.linearMeters.toFixed(1)} m`],
-                    ['Weight', `${adminQuote.totalWeight.toFixed(1)} kg`],
-                    ['Final Quote', `Rs ${Math.round(adminQuote.total).toLocaleString('en-IN')}`]
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg bg-steel-900 p-4 text-white">
-                      <p className="text-sm text-steel-300">{label}</p>
-                      <p className="text-2xl font-bold">{value}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-3 text-sm">
-                  {[
-                    ['Material', adminQuote.materialCost],
-                    ['Fabrication', adminQuote.fabricationCost],
-                    ['Finish', adminQuote.finishingCost],
-                    ['Install', adminQuote.installationCost],
-                    ['Extra', adminQuote.extraCost]
-                  ].map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-steel-200 bg-white p-3">
-                      <p className="text-steel-500">{label}</p>
-                      <p className="font-bold text-steel-900">Rs {Math.round(value).toLocaleString('en-IN')}</p>
-                    </div>
-                  ))}
+                <div className="mt-6 flex flex-wrap items-center gap-4">
+                  <Button onClick={handleSavePricing} disabled={pricingSaving}>
+                    {pricingSaving ? 'Saving…' : 'Save Pricing'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => { setPricingDraft(pricingToDraft(pricing)); setPricingStatus(null); }}
+                    disabled={pricingSaving}
+                  >
+                    Discard Changes
+                  </Button>
+                  {pricingStatus && (
+                    <span className={`text-sm font-medium ${pricingStatus.type === 'success' ? 'text-green-700' : 'text-red-700'}`}>
+                      {pricingStatus.type === 'success' ? '✅ ' : '⚠️ '}{pricingStatus.message}
+                    </span>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardContent className="p-6">
-                <CardTitle className="mb-4">Quotation Reference</CardTitle>
+                <CardTitle className="mb-4">Live Rates Used by Website Calculator</CardTitle>
                 <p className="text-steel-600 mb-6">
-                  Internal assumptions used by the public calculator. Update against current Hyderabad market rates before giving a final quote.
+                  These are the saved central rates currently applied to every estimate on the public website. Edit them in Pricing Settings above.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {[
-                    ['MS material', 'Rs 68/kg'],
-                    ['SS 304 material', 'Rs 275/kg'],
-                    ['MS fabrication', 'Rs 105/kg'],
-                    ['SS fabrication', 'Rs 160/kg'],
-                    ['MS finishing', 'Rs 45/sq.ft'],
-                    ['SS finishing', 'Rs 20/sq.ft'],
-                    ['Wastage', '7%'],
-                    ['Minimum job', 'Rs 2,500']
+                    ['MS material', `Rs ${pricing.metalRates.steel}/kg`],
+                    ['SS 304 material', `Rs ${pricing.metalRates.stainless}/kg`],
+                    ['MS fabrication', `Rs ${pricing.fabricationRates.steel}/kg`],
+                    ['SS fabrication', `Rs ${pricing.fabricationRates.stainless}/kg`],
+                    ['MS finishing', `Rs ${pricing.finishingRates.steel}/sq.ft`],
+                    ['SS finishing', `Rs ${pricing.finishingRates.stainless}/sq.ft`],
+                    ['Wastage', `${pricing.wastagePercent}%`],
+                    ['Minimum job', `Rs ${Number(pricing.minimumCharge).toLocaleString('en-IN')}`]
                   ].map(([label, value]) => (
                     <div key={label} className="rounded-lg border border-steel-200 bg-white p-4">
                       <p className="text-sm text-steel-500">{label}</p>
@@ -1525,11 +1949,11 @@ export default function AdminDashboard() {
                 <CardTitle className="mb-4">Default Section Mapping</CardTitle>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
                   {[
-                    ['Window grills', '10mm round rod + angle frame'],
-                    ['Security grills', '12mm round rod'],
+                    ['Window grills', '10mm square rod + angle frame'],
+                    ['Security grills', '12mm square rod'],
                     ['Decorative grills', '20x20x2mm square pipe'],
                     ['Balcony railings', '20x20x2mm square pipe'],
-                    ['Gate grills', '25x25x3mm angle'],
+                    ['Gate grills', '40x40x2.6mm heavy square pipe'],
                     ['Staircase railings', '20mm round pipe']
                   ].map(([work, section]) => (
                     <div key={work} className="rounded-lg bg-steel-50 p-4">
@@ -1564,6 +1988,8 @@ export default function AdminDashboard() {
             </Card>
           </div>
         )}
+          </div>
+        </main>
       </div>
     </div>
   );

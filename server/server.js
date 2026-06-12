@@ -13,6 +13,7 @@ const app = express();
 const contactRoutes = require('./routes/contact');
 const adminRoutes = require('./routes/admin');
 const analyticsRoutes = require('./routes/analytics');
+const pricingRoutes = require('./routes/pricing');
 
 // CORS configuration
 const envOrigins = [
@@ -116,6 +117,7 @@ connectDB();
 app.use('/api/contact', contactRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/pricing', pricingRoutes);
 
 // Health check endpoint (used by UptimeRobot to keep service alive)
 app.get('/api/health', (req, res) => {

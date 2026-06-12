@@ -11,6 +11,7 @@ import {
   submitContactForm,
   trackInteraction
 } from '../utils/analytics';
+import { DEFAULT_PRICING, fetchPricing } from '../utils/pricing';
 
 // Service Icons
 const ServiceIcons = {
@@ -83,54 +84,9 @@ const GrillTypeIcons = {
 };
 
 // ===== PRICING CONFIGURATION SECTION =====
-// 🔧 EASILY UPDATE THESE RATES TO MANAGE PRICING
-const PRICING_CONFIG = {
-  // Metal base rates per kg (₹)
-  metalRates: {
-    steel: 68,          // Mild Steel / MS sections
-    stainless: 275,     // Stainless Steel 304 sections/pipes
-    aluminum: 300,      // Aluminum sections
-    iron: 75            // Iron sections
-  },
-
-  // Fabrication labour, welding, cutting, grinding and shop overhead per kg.
-  fabricationRates: {
-    steel: 105,
-    stainless: 160,
-    aluminum: 140,
-    iron: 105
-  },
-
-  // Finishing and installation allowances per sq.ft.
-  finishingRates: {
-    steel: 45,
-    stainless: 20,
-    aluminum: 30,
-    iron: 45
-  },
-
-  installationRates: {
-    window: 55,
-    security: 70,
-    decorative: 85,
-    balcony: 95,
-    gate: 120,
-    staircase: 120
-  },
-
-  // Grill complexity multipliers (affects final price)
-  grillComplexity: {
-    window: 1.0,        // Window Grills - Standard fabrication
-    security: 1.3,      // Security Grills - Reinforced, thicker bars
-    decorative: 1.5,    // Decorative Grills - Intricate designs, artistic work
-    balcony: 1.2,       // Balcony Railings - Height requirements, safety standards
-    gate: 1.4,          // Gate Grills - Heavy-duty hinges, locking mechanisms
-    staircase: 1.6      // Staircase Railings - Complex angles, precise measurements
-  },
-
-	wastagePercent: 7,
-	minimumCharge: 2500
-	};
+// Rates are managed centrally from the Admin → Quotation → Pricing Settings
+// page (stored on the server). DEFAULT_PRICING in src/utils/pricing.js is the
+// fallback used until the server responds or when it is unreachable.
 
 	// Map calculator grill type to contact form project type
 	const GRILL_TYPE_TO_PROJECT_TYPE = {
@@ -158,6 +114,22 @@ export default function HomePage() {
   const [quantity, setQuantity] = useState('1');
   const [activeTab, setActiveTab] = useState('home');
 
+  // Centralized pricing: owner-managed rates from the server, with local
+  // defaults so the calculator works even if the backend is asleep.
+  const [pricing, setPricing] = useState(DEFAULT_PRICING);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchPricing()
+      .then((serverPricing) => {
+        if (!cancelled) setPricing(serverPricing);
+      })
+      .catch(() => {
+        // Keep DEFAULT_PRICING — never block the calculator on the backend
+      });
+    return () => { cancelled = true; };
+  }, []);
+
   // Initialize tracking when component mounts
   useEffect(() => {
     initializeTracking();
@@ -179,31 +151,31 @@ export default function HomePage() {
   const [widthUnit, setWidthUnit] = useState('ft');
   const [heightUnit, setHeightUnit] = useState('ft');
   const defaultProfileByGrillType = {
-    window: 'rod_10mm',
-    security: 'rod_12mm',
+    window: 'sq_rod_10mm',
+    security: 'sq_rod_12mm',
     decorative: 'square',
     balcony: 'square',
-    gate: 'angle',
+    gate: 'square_heavy',
     staircase: 'round'
   };
 
   // Rod count state for window grills
   const [verticalRods, setVerticalRods] = useState(3);
   const [horizontalRods, setHorizontalRods] = useState(5);
-  const [useRodCalculation, setUseRodCalculation] = useState(false);
 
   // Function to suggest default rod counts based on window size
   const getDefaultRodCounts = (widthFt, heightFt) => {
-    // Standard spacing: 12-16 inches for vertical, 10-15 inches for horizontal
-    const verticalSpacing = 15; // inches
-    const horizontalSpacing = 12; // inches
+    // Typical Hyderabad window grill: vertical rods at ~4 inch (100mm) gap,
+    // horizontal members roughly every 24 inches (top/middle/bottom pattern)
+    const verticalSpacing = 4; // inches
+    const horizontalSpacing = 24; // inches
 
     const suggestedVertical = Math.max(2, Math.ceil((widthFt * 12) / verticalSpacing));
-    const suggestedHorizontal = Math.max(3, Math.ceil((heightFt * 12) / horizontalSpacing));
+    const suggestedHorizontal = Math.max(2, Math.ceil((heightFt * 12) / horizontalSpacing));
 
     return {
-      vertical: Math.min(suggestedVertical, 6), // Cap at 6 for practical reasons
-      horizontal: Math.min(suggestedHorizontal, 8) // Cap at 8 for practical reasons
+      vertical: suggestedVertical,
+      horizontal: suggestedHorizontal
     };
   };
 
@@ -220,7 +192,6 @@ export default function HomePage() {
 
   useEffect(() => {
     setProfileType(defaultProfileByGrillType[grillType] || 'square');
-    setUseRodCalculation(false);
     setShowAdvancedCalculator(false);
   }, [grillType]);
 
@@ -229,7 +200,6 @@ export default function HomePage() {
   const [customLinearFactor, setCustomLinearFactor] = useState('');
   const [customProfileWeight, setCustomProfileWeight] = useState('');
   const [customProfileSize, setCustomProfileSize] = useState('');
-  const [showAdvancedTooltip, setShowAdvancedTooltip] = useState(false);
 
   // Practical fabrication formula inputs
   const [designType, setDesignType] = useState('simple'); // simple, medium, heavy
@@ -352,6 +322,12 @@ export default function HomePage() {
       aluminum: 0.39,     // 25x25x3mm angle iron in aluminum
       iron: 1.06          // 25x25x3mm angle iron in cast iron
     },
+    square_heavy: {
+      steel: 3.0,         // 40x40x2.6mm square pipe for gate frames/infill in mild steel
+      stainless: 3.0,     // 40x40x2.6mm square pipe in stainless steel
+      aluminum: 1.05,     // 40x40x2.6mm square pipe in aluminum
+      iron: 2.85          // 40x40x2.6mm square pipe in cast iron
+    },
     // Rod thickness options for window grills (using round bar formula: d² × 0.006165 kg/m)
     rod_8mm: {
       steel: 0.39,        // 8mm dia round rod - (8² × 0.006165) = 0.39 kg/m
@@ -370,6 +346,26 @@ export default function HomePage() {
       stainless: 0.89,    // 12mm dia round rod in stainless steel
       aluminum: 0.31,     // 12mm dia round rod in aluminum
       iron: 0.84          // 12mm dia round rod in cast iron
+    },
+    // Square rod options - the practical choice for Hyderabad window/security
+    // grills (square bar formula: d² × 0.00785 kg/m)
+    sq_rod_8mm: {
+      steel: 0.50,        // 8mm square rod - (8² × 0.00785) = 0.50 kg/m
+      stainless: 0.50,
+      aluminum: 0.18,
+      iron: 0.48
+    },
+    sq_rod_10mm: {
+      steel: 0.79,        // 10mm square rod - (10² × 0.00785) = 0.79 kg/m
+      stainless: 0.79,
+      aluminum: 0.27,
+      iron: 0.75
+    },
+    sq_rod_12mm: {
+      steel: 1.13,        // 12mm square rod - (12² × 0.00785) = 1.13 kg/m
+      stainless: 1.13,
+      aluminum: 0.40,
+      iron: 1.07
     }
   };
 
@@ -396,7 +392,7 @@ export default function HomePage() {
     return value * conversions[unit];
   };
 
-  const numericQuantity = parseInt(quantity, 10) || 1;
+  const numericQuantity = Math.max(1, parseInt(quantity, 10) || 1);
 
   // Convert all dimensions to cm for calculation
   const widthInCm = convertToCm(width, widthUnit);
@@ -404,25 +400,26 @@ export default function HomePage() {
 
   // Calculate final rate per kg using centralized pricing config
   const getMetalRate = () => {
-    return PRICING_CONFIG.metalRates[metalType];
+    return pricing.metalRates[metalType];
   };
 
   const getFabricationRate = () => {
-    return PRICING_CONFIG.fabricationRates[metalType] * PRICING_CONFIG.grillComplexity[grillType];
+    return pricing.fabricationRates[metalType] * pricing.grillComplexity[grillType];
   };
 
   const getInstalledProjectCost = (baseWeight, areaSqFt, extraCost = 0) => {
     const materialCost = baseWeight * getMetalRate();
     const fabricationCost = baseWeight * getFabricationRate();
-    const finishingCost = areaSqFt * (PRICING_CONFIG.finishingRates[metalType] || 0);
-    const installationCost = areaSqFt * (PRICING_CONFIG.installationRates[grillType] || 55);
+    const finishingCost = areaSqFt * (pricing.finishingRates[metalType] || 0);
+    const installationCost = areaSqFt * (pricing.installationRates[grillType] || 55);
     const subtotal = materialCost + fabricationCost + finishingCost + installationCost + extraCost;
 
     return {
       materialCost,
       laborCost: fabricationCost + finishingCost + installationCost,
       designCost: extraCost,
-      cost: Math.max(PRICING_CONFIG.minimumCharge, subtotal)
+      cost: Math.max(pricing.minimumCharge, subtotal),
+      minimumApplied: subtotal > 0 && subtotal < pricing.minimumCharge
     };
   };
 
@@ -442,7 +439,8 @@ export default function HomePage() {
         totalLinearMeters: 0,
         linearFactor: 0,
         profileWeight: 0,
-        grillAreaSqMeters: 0
+        grillAreaSqMeters: 0,
+        minimumApplied: false
       };
     }
 
@@ -465,15 +463,17 @@ export default function HomePage() {
       else if (profileType.includes('10mm')) rodDiameter = 10;
       else if (profileType.includes('12mm')) rodDiameter = 12;
 
-	    // Calculate weight using rod formula: Weight (kg) = (d² × L × 0.006165) / 1000
-	    const rodWeight = (Math.pow(rodDiameter, 2) * totalRodLengthMm * 0.006165) / 1000;
+	    // Rod weight: square bar = d² × 0.00785 kg/m, round bar = d² × 0.006165 kg/m.
+	    // Square rod is the practical default for window grills.
+	    const rodShapeFactor = profileType.startsWith('sq_rod') ? 0.00785 : 0.006165;
+	    const rodWeight = (Math.pow(rodDiameter, 2) * totalRodLengthMm * rodShapeFactor) / 1000;
 
 	    const frameWeight = frameLengthMeters * (weightPerMeter.angle?.[metalType] || 1.12);
 
 	    // Apply material density factor per unit
 	    const materialFactor = metalType === 'aluminum' ? 0.35 :
 	                         metalType === 'iron' ? 0.95 : 1.0;
-	    const wastageFactor = 1 + (PRICING_CONFIG.wastagePercent / 100);
+	    const wastageFactor = 1 + (pricing.wastagePercent / 100);
 	    const unitBaseWeight = (rodWeight * materialFactor) + frameWeight;
 	    const unitWeight = unitBaseWeight * wastageFactor;
 	    const unitAreaSqFt = widthInFt * heightInFt;
@@ -481,7 +481,7 @@ export default function HomePage() {
 	    const qty = numericQuantity;
 	    const totalWeight = unitWeight * qty;
 	    const totalAreaSqFt = unitAreaSqFt * qty;
-	    const { cost, materialCost, laborCost, designCost } = getInstalledProjectCost(totalWeight, totalAreaSqFt);
+	    const { cost, materialCost, laborCost, designCost, minimumApplied } = getInstalledProjectCost(totalWeight, totalAreaSqFt);
 
 	    return {
 	      weight: totalWeight,
@@ -489,6 +489,7 @@ export default function HomePage() {
 	      materialCost,
 	      laborCost,
 	      designCost,
+	      minimumApplied,
 	      totalBarLength: (totalRodLengthFt + frameLengthFt) * qty,
 	      numberOfBars: (verticalRods + horizontalRods) * qty,
 	      wastageWeight: totalWeight - (unitBaseWeight * qty),
@@ -560,6 +561,7 @@ export default function HomePage() {
 	      materialCost: installedCost.materialCost,
 	      laborCost: installedCost.laborCost + installAllowance,
 	      designCost,
+	      minimumApplied: installedCost.minimumApplied,
 	      totalBarLength: totalBarLengthAll,
 	      numberOfBars: numberOfBars * qty,
 	      wastageWeight: totalWastageWeight,
@@ -586,7 +588,7 @@ export default function HomePage() {
 	      ? parseFloat(customProfileWeight)
 	      : (weightPerMeter[profileType]?.[metalType] || 1.15);
 	    const baseWeightUnit = Math.max(0.1, totalLinearMetersUnit * profileWeight);
-	    const wastageWeightUnit = baseWeightUnit * (PRICING_CONFIG.wastagePercent / 100);
+	    const wastageWeightUnit = baseWeightUnit * (pricing.wastagePercent / 100);
 	    const weightUnit = baseWeightUnit + wastageWeightUnit;
 
 	    const qty = numericQuantity;
@@ -595,7 +597,7 @@ export default function HomePage() {
 	    const weight = weightUnit * qty;
 	    const wastageWeight = wastageWeightUnit * qty;
 	    const areaSqFt = grillAreaSqMeters * 10.7639;
-	    const { cost, materialCost, laborCost, designCost } = getInstalledProjectCost(weight, areaSqFt);
+	    const { cost, materialCost, laborCost, designCost, minimumApplied } = getInstalledProjectCost(weight, areaSqFt);
 
 	    return {
 	      weight,
@@ -603,6 +605,7 @@ export default function HomePage() {
 	      materialCost,
 	      laborCost,
 	      designCost,
+	      minimumApplied,
 	      totalBarLength: 0,
 	      numberOfBars: 0,
 	      wastageWeight,
@@ -614,11 +617,13 @@ export default function HomePage() {
 	  }
 	};
 
-  const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters } = calculateResults();
+  const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters, minimumApplied } = calculateResults();
 
-  // Track calculator usage when values change
+  // Track calculator usage when values change (debounced so partially-typed
+  // dimensions don't flood the analytics with bogus entries)
   useEffect(() => {
-    if (width > 0 && height > 0 && weight > 0) {
+    if (!(width > 0 && height > 0 && weight > 0)) return;
+    const timer = setTimeout(() => {
       trackCalculatorUsage({
         calculatorType: showAdvancedCalculator ? 'advanced' : 'standard',
         grillType,
@@ -633,7 +638,8 @@ export default function HomePage() {
         estimatedWeight: weight,
         estimatedCost: cost
       });
-    }
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [width, height, grillType, metalType, profileType, weight, cost, showAdvancedCalculator, widthUnit, heightUnit]);
 
 	// Track contact form view when contact tab is active
@@ -1396,282 +1402,8 @@ export default function HomePage() {
                         </p>
                       </div>
 
-                      {/* Profile Type Selection */}
-                      <div className="hidden">
-                        <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                            </svg>
-                            Profile Type
-                          </span>
-                        </label>
-                        <select
-                          value={profileType}
-                          onChange={(e) => setProfileType(e.target.value)}
-                          className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white"
-                        >
-                          <optgroup label="Standard Profiles">
-                            <option value="square">Square Pipe (20×20×2mm) - {weightPerMeter.square?.[metalType] || 1.15} kg/m</option>
-                            <option value="round">Round Pipe (20mm dia×2mm wall) - {weightPerMeter.round?.[metalType] || 0.89} kg/m</option>
-                            <option value="angle">Angle Iron (25×25×3mm) - {weightPerMeter.angle?.[metalType] || 1.78} kg/m</option>
-                          </optgroup>
-                          <optgroup label="Rod Thickness (for Window Grills)">
-                            <option value="rod_8mm">8mm Round Rod - {weightPerMeter.rod_8mm?.[metalType] || 0.39} kg/m</option>
-                            <option value="rod_10mm">10mm Round Rod - {weightPerMeter.rod_10mm?.[metalType] || 0.62} kg/m</option>
-                            <option value="rod_12mm">12mm Round Rod - {weightPerMeter.rod_12mm?.[metalType] || 0.89} kg/m</option>
-                          </optgroup>
-                        </select>
-                        <p className="text-xs text-steel-500 mt-1">
-                          Choose profile type: Standard pipes/angles for structural work, or rod thickness (8mm/10mm/12mm) for window grills. Weights shown for {metalType === 'steel' ? 'mild steel' : metalType === 'stainless' ? 'stainless steel' : metalType === 'aluminum' ? 'aluminum' : 'cast iron'}.
-                        </p>
-                      </div>
                     </div>
 
-                    {/* Rod Count Calculator for Window Grills */}
-                    {false && grillType === 'window' && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-green-50 rounded-xl p-4 sm:p-6 mb-6 border border-green-200"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-lg font-semibold text-green-900 flex items-center gap-2">
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                            Rod-Based Calculation
-                          </h4>
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={useRodCalculation}
-                              onChange={(e) => setUseRodCalculation(e.target.checked)}
-                              className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
-                            />
-                            <span className="text-sm text-green-700">Use Rod Count Method</span>
-                          </label>
-                        </div>
-
-                        {useRodCalculation && (
-                          <div className="space-y-4">
-                            <p className="text-sm text-green-700 mb-4">
-                              Calculate based on actual number of rods needed for your window grill. Default values are suggested based on standard spacing.
-                            </p>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                              <div>
-                                <label className="block text-sm font-medium text-green-700 mb-2">
-                                  Vertical Rods
-                                </label>
-                                <input
-                                  type="number"
-                                  min="2"
-                                  max="10"
-                                  value={verticalRods}
-                                  onChange={(e) => setVerticalRods(parseInt(e.target.value) || 2)}
-                                  className="w-full px-4 py-3 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white"
-                                  placeholder="Number of vertical rods"
-                                />
-                                <p className="text-xs text-green-600 mt-1">
-                                  Suggested: {width && height ? getDefaultRodCounts(convertToFeet(width, widthUnit), convertToFeet(height, heightUnit)).vertical : 3} rods (12-16" spacing)
-                                </p>
-                              </div>
-
-                              <div>
-                                <label className="block text-sm font-medium text-green-700 mb-2">
-                                  Horizontal Rods
-                                </label>
-                                <input
-                                  type="number"
-                                  min="3"
-                                  max="12"
-                                  value={horizontalRods}
-                                  onChange={(e) => setHorizontalRods(parseInt(e.target.value) || 3)}
-                                  className="w-full px-4 py-3 border border-green-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-white"
-                                  placeholder="Number of horizontal rods"
-                                />
-                                <p className="text-xs text-green-600 mt-1">
-                                  Suggested: {width && height ? getDefaultRodCounts(convertToFeet(width, widthUnit), convertToFeet(height, heightUnit)).horizontal : 5} rods (10-15" spacing)
-                                </p>
-                              </div>
-                            </div>
-
-                            {width && height && (
-                              <div className="bg-white rounded-lg p-3 border border-green-200">
-                                <p className="text-sm text-green-800">
-                                  <strong>Rod Configuration:</strong> {verticalRods} vertical × {convertToFeet(height, heightUnit).toFixed(1)}ft + {horizontalRods} horizontal × {convertToFeet(width, widthUnit).toFixed(1)}ft = {((verticalRods * convertToFeet(height, heightUnit)) + (horizontalRods * convertToFeet(width, widthUnit))).toFixed(1)} total feet
-                                </p>
-                              </div>
-                            )}
-
-                            {/* Standard Rod Configuration Reference */}
-                            <div className="bg-white rounded-lg p-3 border border-green-200">
-                              <h5 className="text-sm font-semibold text-green-800 mb-2">📏 Standard Rod Configurations:</h5>
-                              <div className="text-xs text-green-700 space-y-1">
-                                <div className="grid grid-cols-3 gap-2 font-medium border-b border-green-200 pb-1">
-                                  <span>Window Size</span>
-                                  <span>Vertical Rods</span>
-                                  <span>Horizontal Rods</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                  <span>3×4 ft</span>
-                                  <span>2-3 rods</span>
-                                  <span>4 rods</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                  <span>4×5 ft</span>
-                                  <span>3-4 rods</span>
-                                  <span>5 rods</span>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2">
-                                  <span>5×6 ft</span>
-                                  <span>4-5 rods</span>
-                                  <span>6 rods</span>
-                                </div>
-                              </div>
-                              <p className="text-xs text-green-600 mt-2">
-                                <strong>💡 Tip:</strong> Standard spacing is 12-16" for vertical rods and 10-15" for horizontal rods. More rods = better security, fewer rods = better view.
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-
-                    {/* Advanced Calculator Options */}
-                    {false && showAdvancedCalculator && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="bg-blue-50 rounded-xl p-4 sm:p-6 mb-6 border border-blue-200"
-                      >
-                        <h4 className="text-lg font-semibold text-blue-900 mb-4 flex items-center gap-2">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          🏠 Practical Fabrication Calculator
-                        </h4>
-
-                        <div className="bg-green-100 rounded-lg p-3 mb-4">
-                          <p className="text-xs text-green-800">
-                            <strong>🔧 Professional Formula:</strong> Uses industry-standard fabrication pricing with bar spacing, wastage, labor costs, and design complexity factors.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {/* Design Type */}
-                          <div>
-                            <label className="block text-sm font-medium text-blue-700 mb-2">
-                              Design Type
-                            </label>
-                            <select
-                              value={designType}
-                              onChange={(e) => setDesignType(e.target.value)}
-                              className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                            >
-                              <option value="simple">Simple (×1.0) - Basic vertical bars</option>
-                              <option value="medium">Medium (×1.3) - Some horizontal bars</option>
-                              <option value="heavy">Heavy (×1.6) - Complex patterns</option>
-                            </select>
-                            <p className="text-xs text-blue-600 mt-1">
-                              Affects complexity factor and default spacing
-                            </p>
-                          </div>
-
-                          {/* Bar Spacing */}
-                          <div>
-                            <label className="block text-sm font-medium text-blue-700 mb-2">
-                              Bar Spacing (inches)
-                            </label>
-                            <Input
-                              type="number"
-                              step="0.5"
-                              placeholder={`Default: ${designTypeConfig[designType].barSpacingDefault}`}
-                              value={barSpacing}
-                              onChange={(e) => setBarSpacing(e.target.value)}
-                              className="text-center"
-                            />
-                            <p className="text-xs text-blue-600 mt-1">
-                              Distance between vertical bars
-                            </p>
-                          </div>
-
-                          {/* Wastage Percentage */}
-                          <div>
-                            <label className="block text-sm font-medium text-blue-700 mb-2">
-                              Wastage % (5-10%)
-                            </label>
-                            <Input
-                              type="number"
-                              step="1"
-                              min="0"
-                              max="20"
-                              placeholder="7"
-                              value={wastagePercent}
-                              onChange={(e) => setWastagePercent(e.target.value)}
-                              className="text-center"
-                            />
-                            <p className="text-xs text-blue-600 mt-1">
-                              Material wastage during fabrication
-                            </p>
-                          </div>
-
-                          {/* Labor Rate */}
-                          <div>
-                            <label className="block text-sm font-medium text-blue-700 mb-2">
-                              Labor Rate (₹/sq.ft)
-                            </label>
-                            <Input
-                              type="number"
-                              step="10"
-                              placeholder="80"
-                              value={laborRate}
-                              onChange={(e) => setLaborRate(e.target.value)}
-                              className="text-center"
-                            />
-                            <p className="text-xs text-blue-600 mt-1">
-                              Labor charges per square foot
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Custom Design Factor (Optional) */}
-                        <div className="mt-4">
-                          <label className="block text-sm font-medium text-blue-700 mb-2">
-                            Custom Design Factor (₹/foot) - Optional
-                          </label>
-                          <Input
-                            type="number"
-                            step="1"
-                            placeholder="e.g., 15 for decorative work"
-                            value={customDesignFactor}
-                            onChange={(e) => setCustomDesignFactor(e.target.value)}
-                            className="text-center max-w-xs"
-                          />
-                          <p className="text-xs text-blue-600 mt-1">
-                            Additional charges per foot for fancy/decorative work
-                          </p>
-                        </div>
-
-                        <div className="mt-4 p-3 bg-blue-100 rounded-lg">
-                          <p className="text-xs text-blue-800">
-                            <strong>💡 Pro Tip:</strong> Leave fields empty to use standard values.
-                            {customLinearFactor && !isNaN(parseFloat(customLinearFactor)) && (
-                              <span> Using custom linear factor: {customLinearFactor} m/m².</span>
-                            )}
-                            {customProfileWeight && !isNaN(parseFloat(customProfileWeight)) && (
-                              <span> Using custom profile weight: {customProfileWeight} kg/m.</span>
-                            )}
-                          </p>
-                        </div>
-                      </motion.div>
-                    )}
 
                     {/* Results */}
                     {(widthInCm > 0 && heightInCm > 0) && (
@@ -1685,12 +1417,6 @@ export default function HomePage() {
                         <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft mb-6">
                           <h4 className="text-lg font-semibold text-steel-900 mb-4 text-center">Project Summary</h4>
 	                          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-                            <div className="text-center hidden">
-                              <div className="font-medium text-steel-900">
-                                {grillType.charAt(0).toUpperCase() + grillType.slice(1).replace(/([A-Z])/g, ' $1')}
-                              </div>
-                              <div className="text-steel-500">Grill Type</div>
-                            </div>
                             <div className="text-center">
                               <div className="font-medium text-steel-900">
                                 {metalType === 'steel' ? 'Mild Steel' :
@@ -1701,8 +1427,18 @@ export default function HomePage() {
                             </div>
                             <div className="text-center">
                               <div className="font-medium text-steel-900">
-                                {profileType === 'square' ? 'Square Pipe' :
-                                 profileType === 'round' ? 'Round Pipe' : 'Angle Iron'}
+                                {{
+                                  square: 'Square Pipe',
+                                  square_heavy: 'Heavy Square Pipe',
+                                  round: 'Round Pipe',
+                                  angle: 'Angle Iron',
+                                  rod_8mm: '8mm Round Rod',
+                                  rod_10mm: '10mm Round Rod',
+                                  rod_12mm: '12mm Round Rod',
+                                  sq_rod_8mm: '8mm Square Rod',
+                                  sq_rod_10mm: '10mm Square Rod',
+                                  sq_rod_12mm: '12mm Square Rod'
+                                }[profileType] || 'Standard Profile'}
                               </div>
                               <div className="text-steel-500">Profile Type</div>
                             </div>
@@ -1765,103 +1501,32 @@ export default function HomePage() {
                           </div>
                           <div className="bg-white rounded-xl p-4 sm:p-6 shadow-soft">
                             <div className="text-2xl sm:text-3xl font-bold text-accent-600 mb-2">
-                              ₹{(isNaN(cost) ? 0 : cost).toFixed(0)}
+                              ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
                             </div>
                             <div className="text-steel-600 font-medium">
                               Budget Estimate
                             </div>
+                            {grillAreaSqMeters > 0 && cost > 0 && (
+                              <div className="text-xs text-steel-500 mt-1">
+                                ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')} per sq.ft
+                              </div>
+                            )}
                             <div className="text-xs text-steel-500 mt-1">
                               Includes material, fabrication, finish and installation allowance
                             </div>
+                            {minimumApplied && (
+                              <div className="text-xs text-amber-600 mt-1 font-medium">
+                                Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* Advanced Calculator Cost Breakdown */}
-                        {showAdvancedCalculator && (
-                          <div className="mt-4 bg-gradient-to-r from-green-50 to-blue-50 rounded-xl p-4 border border-green-200">
-                            <h5 className="font-semibold text-green-800 mb-3 text-center">💰 Detailed Cost Breakdown</h5>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
-                              <div className="bg-white rounded-lg p-3 text-center">
-                                <div className="font-bold text-green-600">₹{(materialCost || 0).toFixed(0)}</div>
-                                <div className="text-green-700">Material Cost</div>
-                                <div className="text-xs text-green-600 mt-1">
-                                  {Math.round(weight || 0)} kg × ₹{getMetalRate().toFixed(0)}/kg
-                                  {wastageWeight > 0 && (
-                                    <div>+ {wastagePercent}% wastage</div>
-                                  )}
-                                </div>
-                              </div>
-                              <div className="bg-white rounded-lg p-3 text-center">
-                                <div className="font-bold text-blue-600">₹{(laborCost || 0).toFixed(0)}</div>
-                                <div className="text-blue-700">Labor Cost</div>
-                                <div className="text-xs text-blue-600 mt-1">
-                                  {Math.round((widthInCm * 0.0328084) * (heightInCm * 0.0328084))} sq.ft × ₹{laborRate || 80}/sq.ft
-                                </div>
-                              </div>
-                              <div className="bg-white rounded-lg p-3 text-center">
-                                <div className="font-bold text-purple-600">₹{(designCost || 0).toFixed(0)}</div>
-                                <div className="text-purple-700">Design Cost</div>
-                                <div className="text-xs text-purple-600 mt-1">
-                                  {designCost > 0 ? `${totalBarLength?.toFixed(1) || 0} ft × ₹${customDesignFactor}/ft` : 'No custom design'}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
                         <div className="text-center mt-4 sm:mt-6">
-                          <div className="bg-blue-50 rounded-lg p-3 mb-4 hidden">
-                            <p className="text-xs text-blue-700 mb-2">
-                              <strong>💡 {showAdvancedCalculator ? 'Advanced' : 'Professional'} Weight Calculation:</strong> Uses linear profile method - {linearFactor} meters of {customProfileSize || profileType} profile per sq meter for {grillType} grills, weighing {profileWeight.toFixed(2)} kg/meter.
-                              {showAdvancedCalculator && (customLinearFactor || customProfileWeight) && (
-                                <span className="text-orange-600"> (Using custom values)</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-blue-600">
-                              <strong>Calculation:</strong> {Math.round(isNaN(grillAreaSqMeters) ? 0 : grillAreaSqMeters)} m² × {Math.round(linearFactor)} m/m² × {Math.round(profileWeight)} kg/m = {Math.round(isNaN(weight) ? 0 : weight)} kg
-                            </p>
-                            {(profileType?.includes('rod_') || profileType?.includes('mm')) && (
-                              <p className="text-xs text-green-600 mt-1">
-                                <strong>📏 Rod Weight Formula:</strong> For round rods, weight = d² × 0.006165 kg/m (where d = diameter in mm)
-                              </p>
-                            )}
-                          </div>
                           <p className="text-sm text-steel-500 mb-4">
-                            *This is a rough estimate. Final pricing may vary based on design complexity, finishing, and installation requirements.
+                            *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
                           </p>
                           <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                            <div className="relative hidden">
-                              <Button
-                                variant="outline"
-                                onClick={() => setShowAdvancedCalculator(!showAdvancedCalculator)}
-                                onMouseEnter={() => setShowAdvancedTooltip(true)}
-                                onMouseLeave={() => setShowAdvancedTooltip(false)}
-                                className="w-full sm:w-auto"
-                              >
-                                🔧 {showAdvancedCalculator ? 'Simple Calculator' : 'Advanced Calculator'}
-                              </Button>
-
-                              {/* Tooltip */}
-                              {showAdvancedTooltip && !showAdvancedCalculator && (
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50">
-                                  <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 max-w-xs shadow-lg">
-                                    <div className="font-semibold mb-1">🏠 Use Practical Fabrication Calculator for:</div>
-                                    <ul className="text-left space-y-1">
-                                      <li>• Real fabrication pricing with labor costs</li>
-                                      <li>• Bar spacing and wastage calculations</li>
-                                      <li>• Design complexity factors</li>
-                                      <li>• Professional quotations</li>
-                                    </ul>
-                                    <div className="text-center mt-1 text-gray-300">
-                                      Click to expand advanced options
-                                    </div>
-                                    {/* Arrow */}
-                                    <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-                                      <div className="border-4 border-transparent border-t-gray-900"></div>
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
                             <a
                               href={buildQuoteWhatsAppUrl()}
                               target="_blank"
@@ -2174,8 +1839,8 @@ export default function HomePage() {
                                       <div><span className="font-medium">Metal Type:</span> {metalType}</div>
                                       <div><span className="font-medium">Profile:</span> {profileType}</div>
                                       <div><span className="font-medium">Est. Weight:</span> {Math.round(weight)} kg</div>
-                                      <div><span className="font-medium">Est. Cost:</span> ₹{Math.round(cost)}</div>
-                                      {useRodCalculation && grillType === 'window' && (
+                                      <div><span className="font-medium">Est. Cost:</span> ₹{Math.round(cost).toLocaleString('en-IN')}</div>
+                                      {grillType === 'window' && (
                                         <>
                                           <div><span className="font-medium">Vertical Rods:</span> {verticalRods}</div>
                                           <div><span className="font-medium">Horizontal Rods:</span> {horizontalRods}</div>

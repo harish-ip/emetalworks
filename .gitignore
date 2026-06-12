@@ -7,3 +7,6 @@ build/
 playwright-report/
 test-results/
 dist/
+# Local dev logs
+server-dev.log
+vite-dev.log
