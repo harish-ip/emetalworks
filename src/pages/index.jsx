@@ -899,8 +899,8 @@ export default function HomePage() {
       <section className="py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-7xl">
           {/* Tab Navigation */}
-          <div className="flex justify-center mb-8 sm:mb-12">
-            <div className="flex gap-1 xs:gap-2 sm:gap-4 lg:gap-6 xl:gap-8 p-1 xs:p-2 sm:p-3 livspace-tabs rounded-2xl overflow-x-auto scrollbar-hide max-w-full lg:max-w-6xl xl:max-w-7xl">
+          <div className="mb-8 sm:mb-12">
+            <div className="flex gap-1 xs:gap-2 sm:gap-4 lg:gap-6 xl:gap-8 p-1 xs:p-2 sm:p-3 livspace-tabs rounded-2xl overflow-x-auto scrollbar-hide w-full">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -1114,15 +1114,15 @@ export default function HomePage() {
                   <div className="mb-7 text-center">
                     <p className="text-sm font-semibold uppercase tracking-[0.18em] text-primary-700">How it works</p>
                     <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-steel-950">
-                      From first call to final fitting
+                      From enquiry to installation
                     </h2>
                   </div>
                   <div className="grid gap-4 md:grid-cols-4">
                     {[
-                      ['1', 'Tell us the job', 'Share photos, dimensions or book a site visit.'],
-                      ['2', 'Get an estimate', 'Use the calculator or request a measured quote.'],
-                      ['3', 'Approve design', 'Confirm material, finish, pattern and timeline.'],
-                      ['4', 'Fabricate and install', 'Workshop build, site fitting and final quality check.']
+                      ['1', 'Call or WhatsApp us', 'Tell us what you need — grill, gate, railing or shed. Send photos if you have them.'],
+                      ['2', 'We visit & measure', 'Our team comes to your site, takes exact measurements and understands your requirements.'],
+                      ['3', 'You get a quote', 'We send a detailed quote with design, material and timeline. No surprises.'],
+                      ['4', 'Advance, fabricate & fit', 'Pay a small advance, we build in our workshop and install at your site.']
                     ].map(([step, title, text]) => (
                       <div key={step} className="rounded-lg border border-steel-200 bg-steel-50 p-5">
                         <div className="mb-4 flex h-9 w-9 items-center justify-center rounded-full bg-primary-600 text-sm font-bold text-white">{step}</div>
@@ -1258,345 +1258,276 @@ export default function HomePage() {
                   </motion.div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-                  {/* ===== eMetal Calculator brand + live estimate panel ===== */}
-                  <div className="order-2 lg:order-1 lg:col-span-2 lg:sticky lg:top-24" data-testid="estimate-panel">
-                    <div className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white p-6 sm:p-8 shadow-xl">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-display font-extrabold text-xl shadow-lg">
-                          eM
-                        </div>
-                        <div>
-                          <h2 className="text-2xl font-display font-bold leading-tight">
-                            eMetal <span className="text-accent-400">Calculator</span>
-                          </h2>
-                          <p className="text-xs text-slate-400">Instant fabrication budget · Hyderabad</p>
-                        </div>
-                      </div>
+                {/* ===== Calculator + How-to layout ===== */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-                      {(widthInCm > 0 && heightInCm > 0) ? (
-                        <motion.div
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="mt-6"
-                        >
-                          <p className="text-sm font-medium text-slate-300">Budget Estimate</p>
-                          <p data-testid="est-cost" className="text-4xl font-extrabold tracking-tight mt-1">
-                            ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
-                          </p>
-                          <div className="flex flex-wrap gap-2 mt-3">
-                            {grillAreaSqMeters > 0 && cost > 0 && (
-                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
-                                ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')}/sq.ft
-                              </span>
-                            )}
-                            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-slate-200">
-                              All-inclusive estimate
-                            </span>
-                          </div>
-                          {minimumApplied && (
-                            <p className="mt-3 text-xs font-medium text-amber-300">
-                              ⚠ Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
-                            </p>
-                          )}
+                {/* Calculator card — full width on mobile, 2/3 on desktop */}
+                <div className="lg:col-span-2">
+                <div data-testid="estimate-panel" className="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 text-white p-6 sm:p-8 shadow-xl">
 
-                          <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                            <div className="rounded-xl bg-white/10 p-3" data-testid="est-weight">
-                              <p className="text-lg font-bold leading-none">{Math.round(isNaN(weight) ? 0 : weight)}</p>
-                              <p className="text-[11px] text-slate-300 mt-1">kg · Est. Weight</p>
-                            </div>
-                            <div className="rounded-xl bg-white/10 p-3">
-                              <p className="text-lg font-bold leading-none">{(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)}</p>
-                              <p className="text-[11px] text-slate-300 mt-1">m · Material</p>
-                            </div>
-                            <div className="rounded-xl bg-white/10 p-3">
-                              <p className="text-lg font-bold leading-none">{numericQuantity}</p>
-                              <p className="text-[11px] text-slate-300 mt-1">Quantity</p>
-                            </div>
-                          </div>
-
-                          <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
-                            {[
-                              ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
-                              ['Section', {
-                                square: 'Square Pipe',
-                                square_heavy: 'Heavy Square Pipe',
-                                round: 'Round Pipe',
-                                angle: 'Angle Iron',
-                                rod_8mm: '8mm Round Rod',
-                                rod_10mm: '10mm Round Rod',
-                                rod_12mm: '12mm Round Rod',
-                                sq_rod_8mm: '8mm Square Rod',
-                                sq_rod_10mm: '10mm Square Rod',
-                                sq_rod_12mm: '12mm Square Rod'
-                              }[profileType] || 'Standard Profile'],
-                              ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
-                              ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`]
-                            ].map(([label, value]) => (
-                              <div key={label} className="flex items-center justify-between">
-                                <span className="text-slate-400">{label}</span>
-                                <span className="font-medium text-slate-100">{value}</span>
-                              </div>
-                            ))}
-                          </div>
-
-                          <div className="mt-6 space-y-3">
-                            <button
-                              onClick={handleWhatsAppQuoteClick}
-                              className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
-                            >
-                              <WhatsAppIcon className="w-5 h-5" />
-                              Get this quote on WhatsApp
-                            </button>
-                            <button
-                              onClick={() => handleTabSwitch('contact')}
-                              className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
-                            >
-                              Send for Final Quote
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-                            *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
-                          </p>
-                        </motion.div>
-                      ) : (
-                        <div className="mt-6">
-                          <p className="text-sm text-slate-300 leading-relaxed">
-                            Get a practical budget for your grill, railing or gate in seconds — the same method our workshop uses.
-                          </p>
-                          <div className="mt-5 space-y-4">
-                            {[
-                              ['1', 'Enter width and height', 'Approximate size is enough — feet by default'],
-                              ['2', 'Pick work type and material', 'Window, balcony, gate… mild steel or SS 304'],
-                              ['3', 'Get your budget instantly', 'Send it to us on WhatsApp for the final quote']
-                            ].map(([step, title, sub]) => (
-                              <div key={step} className="flex items-start gap-3">
-                                <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-accent-400 shrink-0">
-                                  {step}
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-slate-100 text-sm">{title}</p>
-                                  <p className="text-xs text-slate-400">{sub}</p>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-6 border-t border-white/10 pt-4 space-y-2">
-                            {['Transparent market-based rates', 'Free site measurement before final quote', 'Fabrication-grade weight calculation'].map((point) => (
-                              <p key={point} className="flex items-center gap-2 text-xs text-slate-300">
-                                <svg className="w-4 h-4 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                                {point}
-                              </p>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                  {/* Header */}
+                  <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/10">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-display font-extrabold text-xl shadow-lg">
+                      eM
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-display font-bold leading-tight">
+                        eMetal <span className="text-accent-400">Calculator</span>
+                      </h2>
+                      <p className="text-xs text-slate-400">Instant fabrication budget · Hyderabad</p>
                     </div>
                   </div>
 
-                  {/* ===== Inputs ===== */}
-                  <div className="order-1 lg:order-2 lg:col-span-3">
-                <Card variant="glass" className="backdrop-blur-sm">
-                  <CardContent className="p-4 sm:p-6 lg:p-8">
-                    <p className="text-sm font-medium text-steel-500 mb-1.5">Get your budget estimate using</p>
-                    <h3 className="text-2xl sm:text-3xl font-display font-extrabold text-steel-900 mb-3">
-                      <span className="bg-accent-100 text-accent-700 px-2 py-0.5 rounded-lg">eMetal Calculator</span>
-                    </h3>
-                    <div className="p-3 bg-blue-50 rounded-lg mb-6">
-                      <p className="text-sm text-blue-800">
-                        <span className="font-medium">Quick estimate:</span> Feet is selected by default. Final quotation depends on site measurement, design, finish and installation.
-                      </p>
+                  {/* Dimensions + Quantity */}
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Dimensions &amp; Quantity</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    {/* Width */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Width</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder="Enter width"
+                          value={width || ''}
+                          onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
+                          className="flex-1 min-w-0 bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white placeholder:text-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                        />
+                        <select
+                          value={widthUnit}
+                          onChange={(e) => setWidthUnit(e.target.value)}
+                          className="bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        >
+                          <option className="bg-slate-800" value="ft">ft</option>
+                          <option className="bg-slate-800" value="inch">inch</option>
+                          <option className="bg-slate-800" value="cm">cm</option>
+                          <option className="bg-slate-800" value="mm">mm</option>
+                          <option className="bg-slate-800" value="m">m</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">= {widthInCm.toFixed(1)} cm</p>
                     </div>
-                    {/* Dimensions with Unit Converter */}
-                    <div className="mb-4">
-                      <p className="text-sm text-steel-600">
-                        <strong>Enter approximate dimensions:</strong> Width (horizontal) x Height (vertical)
-                      </p>
+                    {/* Height */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Height</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          placeholder="Enter height"
+                          value={height || ''}
+                          onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
+                          className="flex-1 min-w-0 bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white placeholder:text-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                        />
+                        <select
+                          value={heightUnit}
+                          onChange={(e) => setHeightUnit(e.target.value)}
+                          className="bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                        >
+                          <option className="bg-slate-800" value="ft">ft</option>
+                          <option className="bg-slate-800" value="inch">inch</option>
+                          <option className="bg-slate-800" value="cm">cm</option>
+                          <option className="bg-slate-800" value="mm">mm</option>
+                          <option className="bg-slate-800" value="m">m</option>
+                        </select>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">= {heightInCm.toFixed(1)} cm</p>
                     </div>
-	                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                      {/* Width Input with Unit Selection */}
-                      <div>
-                        <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <strong className="font-bold">Width</strong>
-                          </span>
-                        </label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            placeholder="Enter width"
-                            value={width || ''}
-                            onChange={(e) => setWidth(parseFloat(e.target.value) || 0)}
-                            className="text-center flex-1"
-                          />
-                          <select
-                            value={widthUnit}
-                            onChange={(e) => setWidthUnit(e.target.value)}
-                            className="px-3 py-2 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-sm"
-                          >
-                            <option value="ft">ft</option>
-                            <option value="inch">inch</option>
-                            <option value="cm">cm</option>
-                            <option value="mm">mm</option>
-                            <option value="m">m</option>
-                          </select>
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-sm font-medium text-slate-300 mb-2">Quantity</label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Number of windows/units"
+                        value={quantity}
+                        onChange={(e) => setQuantity(e.target.value)}
+                        className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-white placeholder:text-slate-500 text-center focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Units of this size</p>
+                    </div>
+                  </div>
+
+                  {/* Work type */}
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-3">Work Type</p>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-3 mb-6">
+                    {[
+                      { value: 'window', name: 'Window Grills', icon: GrillTypeIcons.window },
+                      { value: 'security', name: 'Security Grills', icon: GrillTypeIcons.security },
+                      { value: 'decorative', name: 'Decorative Grills', icon: GrillTypeIcons.decorative },
+                      { value: 'balcony', name: 'Balcony Railings', icon: GrillTypeIcons.balcony },
+                      { value: 'gate', name: 'Gate Grills', icon: GrillTypeIcons.gate },
+                      { value: 'staircase', name: 'Staircase Railings', icon: GrillTypeIcons.staircase }
+                    ].map((type) => (
+                      <motion.div
+                        key={type.value}
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className={`cursor-pointer p-3 rounded-xl border transition-all duration-200 text-center ${
+                          grillType === type.value
+                            ? 'border-accent-400 bg-accent-400/20 text-accent-300'
+                            : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:border-white/30'
+                        }`}
+                        onClick={() => setGrillType(type.value)}
+                      >
+                        <div className={`w-8 h-8 mx-auto mb-1.5 flex items-center justify-center rounded-lg ${
+                          grillType === type.value ? 'bg-accent-400/20' : 'bg-white/10'
+                        }`}>
+                          {type.icon}
                         </div>
-                        <p className="text-xs text-steel-500 mt-1">
-                          = {widthInCm.toFixed(1)} cm
+                        <p className="text-xs font-medium leading-tight">{type.name}</p>
+                      </motion.div>
+                    ))}
+                  </div>
+
+                  {/* Material */}
+                  <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Material</p>
+                  <select
+                    value={metalType}
+                    onChange={(e) => setMetalType(e.target.value)}
+                    className="w-full bg-white/10 border border-white/20 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent mb-1"
+                  >
+                    <option className="bg-slate-800" value="steel">Mild Steel - budget friendly</option>
+                    <option className="bg-slate-800" value="stainless">Stainless Steel 304 - premium, low maintenance</option>
+                  </select>
+                  <p className="text-xs text-slate-500 mb-6">Mild steel usually needs paint. Stainless steel costs more but is easier to maintain.</p>
+
+                  {/* Live estimate — conditional */}
+                  {(widthInCm > 0 && heightInCm > 0) ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="border-t border-white/10 pt-6"
+                    >
+                      <p className="text-sm font-medium text-slate-300">Budget Estimate</p>
+                      <p data-testid="est-cost" className="text-4xl font-extrabold tracking-tight mt-1">
+                        ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
+                      </p>
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        {grillAreaSqMeters > 0 && cost > 0 && (
+                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
+                            ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')}/sq.ft
+                          </span>
+                        )}
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-slate-200">
+                          All-inclusive estimate
+                        </span>
+                      </div>
+                      {minimumApplied && (
+                        <p className="mt-3 text-xs font-medium text-amber-300">
+                          ⚠ Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
                         </p>
+                      )}
+
+                      <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                        <div className="rounded-xl bg-white/10 p-3" data-testid="est-weight">
+                          <p className="text-lg font-bold leading-none">{Math.round(isNaN(weight) ? 0 : weight)}</p>
+                          <p className="text-[11px] text-slate-300 mt-1">kg · Est. Weight</p>
+                        </div>
+                        <div className="rounded-xl bg-white/10 p-3">
+                          <p className="text-lg font-bold leading-none">{(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)}</p>
+                          <p className="text-[11px] text-slate-300 mt-1">m · Material</p>
+                        </div>
+                        <div className="rounded-xl bg-white/10 p-3">
+                          <p className="text-lg font-bold leading-none">{numericQuantity}</p>
+                          <p className="text-[11px] text-slate-300 mt-1">Quantity</p>
+                        </div>
                       </div>
 
-	                    {/* Height Input with Unit Selection */}
-	                    <div>
-                        <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            <strong className="font-bold">Height</strong>
-                          </span>
-                        </label>
-                        <div className="flex gap-2">
-                          <Input
-                            type="number"
-                            placeholder="Enter height"
-                            value={height || ''}
-                            onChange={(e) => setHeight(parseFloat(e.target.value) || 0)}
-                            className="text-center flex-1"
-                          />
-                          <select
-                            value={heightUnit}
-                            onChange={(e) => setHeightUnit(e.target.value)}
-                            className="px-3 py-2 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent bg-white text-sm"
-                          >
-                            <option value="ft">ft</option>
-                            <option value="inch">inch</option>
-                            <option value="cm">cm</option>
-                            <option value="mm">mm</option>
-                            <option value="m">m</option>
-                          </select>
-                        </div>
-                        <p className="text-xs text-steel-500 mt-1">
-                          = {heightInCm.toFixed(1)} cm
-                        </p>
-	                      </div>
-	                    </div>
-
-	                    {/* Quantity Input */}
-	                    <div>
-	                      <label className="block text-sm font-medium text-steel-700 mb-2">
-	                        <span className="flex items-center gap-2">
-	                          <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-	                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 12h18M3 17h18" />
-	                          </svg>
-	                          <strong className="font-bold">Quantity</strong>
-	                        </span>
-	                      </label>
-	                      <Input
-	                        type="number"
-	                        min="1"
-	                        placeholder="Number of windows/units"
-	                        value={quantity}
-	                        onChange={(e) => setQuantity(e.target.value)}
-	                        className="text-center"
-	                      />
-	                      <p className="text-xs text-steel-500 mt-1">
-	                        How many windows/units of this size you need.
-	                      </p>
-	                    </div>
-
-                    <div className="rounded-xl border border-steel-200 bg-steel-50 p-4 mb-6 sm:mb-8 max-w-2xl mx-auto">
-                      <h4 className="font-semibold text-steel-900 mb-2">We will confirm the technical details</h4>
-                      <p className="text-sm text-steel-600 leading-relaxed">
-                        You do not need to choose rod size, pipe section, paint or fitting method here. This estimate uses common market assumptions; our team will check the site and share a final quote.
-                      </p>
-                    </div>
-
-                    {/* Grill Type Selection - Tiles */}
-                    <div className="mb-8">
-                      <h3 className="text-lg font-bold text-steel-900 mb-4 flex items-center gap-2">
-                        <svg className="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                        </svg>
-                        Pick your work type
-                      </h3>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+                      <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
                         {[
-                          { value: 'window', name: 'Window Grills', icon: GrillTypeIcons.window, color: 'accent' },
-                          { value: 'security', name: 'Security Grills', icon: GrillTypeIcons.security, color: 'success' },
-                          { value: 'decorative', name: 'Decorative Grills', icon: GrillTypeIcons.decorative, color: 'warning' },
-                          { value: 'balcony', name: 'Balcony Railings', icon: GrillTypeIcons.balcony, color: 'primary' },
-                          { value: 'gate', name: 'Gate Grills', icon: GrillTypeIcons.gate, color: 'steel' },
-                          { value: 'staircase', name: 'Staircase Railings', icon: GrillTypeIcons.staircase, color: 'primary' }
-                        ].map((type) => (
-                          <motion.div
-                            key={type.value}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            className={`cursor-pointer p-3 sm:p-4 rounded-xl border-2 transition-all duration-200 ${
-                              grillType === type.value
-                                ? `border-${type.color}-500 bg-${type.color}-50 shadow-lg`
-                                : 'border-steel-200 bg-white hover:border-steel-300 hover:shadow-md'
-                            }`}
-                            onClick={() => setGrillType(type.value)}
-                          >
-                            <div className={`w-8 h-8 sm:w-10 sm:h-10 mx-auto mb-2 flex items-center justify-center rounded-lg ${
-                              grillType === type.value ? `bg-${type.color}-100` : 'bg-steel-100'
-                            }`}>
-                              <div className={grillType === type.value ? `text-${type.color}-600` : 'text-steel-600'}>
-                                {type.icon}
-                              </div>
-                            </div>
-                            <p className={`text-xs sm:text-sm font-medium text-center leading-tight ${
-                              grillType === type.value ? `text-${type.color}-700` : 'text-steel-700'
-                            }`}>
-                              {type.name}
-                            </p>
-                          </motion.div>
+                          ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
+                          ['Section', {
+                            square: 'Square Pipe',
+                            square_heavy: 'Heavy Square Pipe',
+                            round: 'Round Pipe',
+                            angle: 'Angle Iron',
+                            rod_8mm: '8mm Round Rod',
+                            rod_10mm: '10mm Round Rod',
+                            rod_12mm: '12mm Round Rod',
+                            sq_rod_8mm: '8mm Square Rod',
+                            sq_rod_10mm: '10mm Square Rod',
+                            sq_rod_12mm: '12mm Square Rod'
+                          }[profileType] || 'Standard Profile'],
+                          ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
+                          ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`]
+                        ].map(([label, value]) => (
+                          <div key={label} className="flex items-center justify-between">
+                            <span className="text-slate-400">{label}</span>
+                            <span className="font-medium text-slate-100">{value}</span>
+                          </div>
                         ))}
                       </div>
-                      <p className="text-xs text-steel-500 mt-3 text-center">
-                        Pick the closest option. We will confirm the exact design and section size before final quote.
-                      </p>
-                    </div>
 
-                    {/* Customer-friendly material selection */}
-                    <div className="grid grid-cols-1 gap-4 sm:gap-6 mb-6 sm:mb-8 max-w-2xl mx-auto">
-                      <div>
-                        <label className="block text-sm font-medium text-steel-700 mb-2">
-                          <span className="flex items-center gap-2">
-                            <svg className="w-5 h-5 text-accent-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                            </svg>
-                            <strong className="font-bold">Material</strong>
-                          </span>
-                        </label>
-                        <select
-                          value={metalType}
-                          onChange={(e) => setMetalType(e.target.value)}
-                          className="w-full px-4 py-3 border border-steel-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200 bg-white"
+                      <div className="mt-6 space-y-3">
+                        <button
+                          onClick={handleWhatsAppQuoteClick}
+                          className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
                         >
-                          <option value="steel">Mild Steel - budget friendly</option>
-                          <option value="stainless">Stainless Steel 304 - premium, low maintenance</option>
-                        </select>
-                        <p className="text-xs text-steel-500 mt-1">
-                          Mild steel usually needs paint. Stainless steel costs more but is easier to maintain.
-                        </p>
+                          <WhatsAppIcon className="w-5 h-5" />
+                          Get this quote on WhatsApp
+                        </button>
+                        <button
+                          onClick={() => handleTabSwitch('contact')}
+                          className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
+                        >
+                          Send for Final Quote
+                        </button>
                       </div>
-
+                      <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
+                        *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
+                      </p>
+                    </motion.div>
+                  ) : (
+                    <div className="border-t border-white/10 pt-6">
+                      <p className="text-sm text-slate-400 text-center">Enter width and height above to see your budget estimate instantly.</p>
                     </div>
-
-
-                  </CardContent>
-                </Card>
-                  </div>
+                  )}
                 </div>
+                </div>{/* end col-span-2 */}
+
+                {/* How-to panel — desktop only */}
+                <div className="hidden lg:flex lg:col-span-1 flex-col gap-5 sticky top-24">
+                  <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 border border-white/10 shadow-xl p-6">
+                    <p className="text-xs font-bold uppercase tracking-widest text-accent-400 mb-4">How to use</p>
+                    <ol className="space-y-4">
+                      {[
+                        ['Enter dimensions', 'Type the width and height of your window, gate or railing. Feet is the default — switch to inch, cm or mm if needed.'],
+                        ['Pick work type', 'Select the closest option. We confirm exact design before final quote.'],
+                        ['Choose material', 'Mild Steel is cheaper and common. SS 304 costs more but needs no painting.'],
+                        ['Get your estimate', 'The budget appears instantly. Send on WhatsApp or submit for a final measured quote.'],
+                      ].map(([title, desc], i) => (
+                        <li key={i} className="flex gap-3">
+                          <span className="w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                          <div>
+                            <p className="text-sm font-bold text-white">{title}</p>
+                            <p className="text-sm text-slate-200 mt-0.5 leading-relaxed">{desc}</p>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+
+                  <div className="rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-primary-900 border border-white/10 shadow-xl p-5">
+                    <p className="text-xs font-bold uppercase tracking-widest text-accent-400 mb-3">Good to know</p>
+                    <ul className="space-y-2.5">
+                      {[
+                        'Estimate excludes GST',
+                        'Free site visit before final quote',
+                        'Market-based metal rates used',
+                        'Final price after measuring on site',
+                      ].map((point) => (
+                        <li key={point} className="flex items-start gap-2 text-sm text-white">
+                          <svg className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>{/* end how-to panel */}
+
+                </div>{/* end grid */}
               </motion.div>
             )}
 
