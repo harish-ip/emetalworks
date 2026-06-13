@@ -10,7 +10,8 @@ const contactSubmissionSchema = new mongoose.Schema({
   },
   email: {
     type: String,
-    required: [true, 'Email is required'],
+    // Not required: WhatsApp quote leads carry only name + phone
+    required: false,
     trim: true,
     lowercase: true,
     match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
@@ -158,7 +159,7 @@ const contactSubmissionSchema = new mongoose.Schema({
   // Source tracking
   source: {
     type: String,
-    enum: ['website_contact', 'calculator_quote', 'service_inquiry', 'direct'],
+    enum: ['website_contact', 'calculator_quote', 'service_inquiry', 'direct', 'whatsapp_quote'],
     default: 'website_contact'
   }
 }, {

@@ -9,7 +9,8 @@ import {
   trackCalculatorUsage,
   trackContactFormInteraction,
   submitContactForm,
-  trackInteraction
+  trackInteraction,
+  getSessionInfo
 } from '../utils/analytics';
 import { DEFAULT_PRICING, fetchPricing } from '../utils/pricing';
 
@@ -256,6 +257,13 @@ export default function HomePage() {
 	  const [formErrors, setFormErrors] = useState([]);
 	  const [includeCalculatorData, setIncludeCalculatorData] = useState(false);
 	  const [hasManualProjectTypeChange, setHasManualProjectTypeChange] = useState(false);
+
+  // WhatsApp lead capture modal state
+  const [waModal, setWaModal] = useState(false);
+  const [waName, setWaName] = useState('');
+  const [waPhone, setWaPhone] = useState('');
+  const [waSubmitting, setWaSubmitting] = useState(false);
+  const [waPendingUrl, setWaPendingUrl] = useState('');
 
   // Quote notification state
   const [quoteNotification, setQuoteNotification] = useState(null); // 'success', 'error', or null
@@ -663,6 +671,49 @@ export default function HomePage() {
 	  ].filter(Boolean);
 	  return `https://wa.me/${WHATSAPP_PHONE}?text=${encodeURIComponent(lines.join('\n'))}`;
 	};
+
+  // Open the name+phone modal, saving the WhatsApp URL to open after capture
+  const handleWhatsAppQuoteClick = (e) => {
+    e.preventDefault();
+    setWaPendingUrl(buildQuoteWhatsAppUrl());
+    setWaModal(true);
+  };
+
+  const handleWaSubmit = async (e) => {
+    e.preventDefault();
+    if (!waName.trim() || !waPhone.trim()) return;
+    setWaSubmitting(true);
+    try {
+      const { sessionId, visitorId } = getSessionInfo();
+      await fetch('/api/contact/whatsapp-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: waName.trim(),
+          phone: waPhone.trim(),
+          calculatorData: cost > 0 ? {
+            dimensions: { width, height, widthUnit, heightUnit },
+            grillType,
+            metalType,
+            profileType,
+            quantity: parseInt(quantity) || 1,
+            estimatedWeight: Math.round(weight),
+            estimatedCost: Math.round(cost),
+            calculatorType: 'rod_based'
+          } : null,
+          sessionId,
+          visitorId
+        })
+      });
+    } catch (_) {
+      // Silently fail — don't block the user from opening WhatsApp
+    }
+    setWaSubmitting(false);
+    setWaModal(false);
+    setWaName('');
+    setWaPhone('');
+    window.open(waPendingUrl, '_blank', 'noopener,noreferrer');
+  };
 
 	// Handle contact form input changes
 	const handleContactInputChange = (e) => {
@@ -1291,15 +1342,13 @@ export default function HomePage() {
                           </div>
 
                           <div className="mt-6 space-y-3">
-                            <a
-                              href={buildQuoteWhatsAppUrl()}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
+                              onClick={handleWhatsAppQuoteClick}
                               className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
                             >
                               <WhatsAppIcon className="w-5 h-5" />
                               Get this quote on WhatsApp
-                            </a>
+                            </button>
                             <button
                               onClick={() => handleTabSwitch('contact')}
                               className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
@@ -2038,6 +2087,54 @@ export default function HomePage() {
           </div>
         </div>
       </footer>
+
+      {/* WhatsApp lead capture modal */}
+      {waModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={() => setWaModal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-steel-900 mb-1">Send your quote on WhatsApp</h3>
+            <p className="text-sm text-steel-500 mb-5">Enter your name and number so we can follow up.</p>
+            <form onSubmit={handleWaSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-steel-700 mb-1">Your Name</label>
+                <input
+                  type="text"
+                  value={waName}
+                  onChange={e => setWaName(e.target.value)}
+                  placeholder="e.g. Rajesh Kumar"
+                  required
+                  className="w-full rounded-xl border border-steel-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-steel-700 mb-1">Phone Number</label>
+                <input
+                  type="tel"
+                  value={waPhone}
+                  onChange={e => setWaPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  required
+                  className="w-full rounded-xl border border-steel-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button type="button" onClick={() => setWaModal(false)} className="flex-1 rounded-xl border border-steel-300 px-4 py-2.5 text-sm font-semibold text-steel-700 hover:bg-steel-50 transition-colors">
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={waSubmitting || !waName.trim() || !waPhone.trim()}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5b] disabled:opacity-50 transition-colors"
+                >
+                  <WhatsAppIcon className="w-4 h-4" />
+                  {waSubmitting ? 'Saving…' : 'Open WhatsApp'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

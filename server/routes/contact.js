@@ -30,7 +30,56 @@ const contactSchema = Joi.object({
   }).unknown(true).allow(null).optional(),
   sessionId: Joi.string().required(),
   visitorId: Joi.string().required(),
-  source: Joi.string().valid('website_contact', 'calculator_quote', 'service_inquiry', 'direct').optional()
+  source: Joi.string().valid('website_contact', 'calculator_quote', 'service_inquiry', 'direct', 'whatsapp_quote').optional()
+});
+
+// Minimal schema for WhatsApp quote leads (name + phone only)
+const whatsappLeadSchema = Joi.object({
+  name: Joi.string().trim().min(2).max(100).required(),
+  phone: Joi.string().pattern(/^[\+]?[0-9][0-9\s-]{7,20}$/).required(),
+  calculatorData: Joi.object().unknown(true).allow(null).optional(),
+  sessionId: Joi.string().required(),
+  visitorId: Joi.string().required()
+});
+
+// POST /api/contact/whatsapp-lead - Capture name+phone before opening WhatsApp
+router.post('/whatsapp-lead', async (req, res) => {
+  try {
+    const { error, value } = whatsappLeadSchema.validate(req.body);
+    if (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.details.map(d => ({ field: d.path.join('.'), message: d.message }))
+      });
+    }
+
+    const ipAddress = req.ip || req.connection.remoteAddress || 'unknown';
+    const userAgent = req.headers['user-agent'] || '';
+    const referrer = req.headers.referer || 'direct';
+
+    const submission = new ContactSubmission({
+      name: value.name,
+      phone: value.phone,
+      subject: 'WhatsApp Quote Request',
+      message: 'Customer requested quote via WhatsApp button.',
+      calculatorData: value.calculatorData || undefined,
+      sessionId: value.sessionId,
+      visitorId: value.visitorId,
+      source: 'whatsapp_quote',
+      ipAddress,
+      userAgent,
+      referrer
+    });
+
+    await submission.save();
+    console.log(`📱 WhatsApp lead captured: ${submission.name} (${submission.phone})`);
+
+    res.json({ success: true, submissionId: submission._id });
+  } catch (err) {
+    console.error('Error saving WhatsApp lead:', err);
+    res.status(500).json({ success: false, message: 'Failed to save lead' });
+  }
 });
 
 // POST /api/contact/submit - Submit contact form

@@ -1087,6 +1087,9 @@ export default function AdminDashboard() {
                                 >
                                   {contact.name}
                                 </button>
+                                {contact.source === 'whatsapp_quote' && (
+                                  <span className="ml-1 inline-block rounded-full bg-[#25D366]/15 px-2 py-0.5 text-[10px] font-semibold text-[#1a9e4d]">📱 WhatsApp</span>
+                                )}
                                 {contact.email && (
                                   <div className="text-xs text-steel-500">{contact.email}</div>
                                 )}
