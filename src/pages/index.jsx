@@ -1157,7 +1157,7 @@ export default function HomePage() {
                   </div>
                   <div className="grid gap-4 md:grid-cols-4">
                     {[
-                      ['1', 'Call or WhatsApp us', 'Tell us what you need — grill, gate, railing or shed. Send photos if you have them.'],
+                      ['1', 'Get Free Estimate', 'Use our calculator or WhatsApp us your dimensions — get a ballpark price instantly, no commitment.'],
                       ['2', 'We visit & measure', 'Our team comes to your site, takes exact measurements and understands your requirements.'],
                       ['3', 'You get a quote', 'We send a detailed quote with design, material and timeline. No surprises.'],
                       ['4', 'Advance, fabricate & fit', 'Pay a small advance, we build in our workshop and install at your site.']
