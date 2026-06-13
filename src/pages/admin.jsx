@@ -453,84 +453,55 @@ export default function AdminDashboard() {
   };
 
   const loadDashboardData = async () => {
-  setLoading(true);
+    setLoading(true);
+    setError(null);
 
-  try {
-    // Load dashboard stats
-    const dashboardResponse = await fetch(`${API_BASE_URL}/api/admin/dashboard`, {
-      headers: {
-        ...authHeader(),
-      }
-    });
+    const safeFetch = (url) =>
+      fetch(url, { headers: authHeader() })
+        .then((r) => r.json())
+        .catch(() => ({ success: false }));
 
-    // Load contact submissions
-    const contactsResponse = await fetch(`${API_BASE_URL}/api/contact/submissions`, {
-      headers: {
-        ...authHeader(),
-      }
-    });
+    const [dashboardData, contactsData, analyticsData] = await Promise.all([
+      safeFetch(`${API_BASE_URL}/api/admin/dashboard`),
+      safeFetch(`${API_BASE_URL}/api/contact/submissions`),
+      safeFetch(`${API_BASE_URL}/api/analytics/summary`),
+    ]);
 
-    const analyticsResponse = await fetch(`${API_BASE_URL}/api/analytics/summary`, {
-      headers: {
-        ...authHeader(),
-      }
-    });
-
-    const dashboardData = await dashboardResponse.json();
-    const contactsData = await contactsResponse.json();
-    const analyticsData = await analyticsResponse.json();
-
-    if (dashboardData.success && contactsData.success && analyticsData.success) {
-      const submissions = contactsData.data.submissions || [];
-
-      // Named calculator leads = people who submitted a quote from the calculator
-      const calculatorLeads = submissions.filter((s) => s.source === 'calculator_quote');
-
-      // Update dashboard data with real contact count
-      const updatedDashboardData = {
-        ...dashboardData.data,
-        totalVisits: analyticsData.data.totalVisits || 0,
-        calculatorPageVisits: analyticsData.data.calculatorPageVisits || 0,
-        uniqueVisitors: analyticsData.data.uniqueVisitors || 0,
-        calculatorUniqueVisitors: analyticsData.data.calculatorUniqueVisitors || 0,
-        recentCalculatorUsers: analyticsData.data.recentCalculatorUsers || [],
-        hitsToday: analyticsData.data.hitsToday || 0,
-        dailyHits: analyticsData.data.dailyHits || [],
-        calculatorHitsToday: analyticsData.data.calculatorHitsToday || 0,
-        dailyCalculatorHits: analyticsData.data.dailyCalculatorHits || [],
-        calculatorLeads,
-        totalContacts: submissions.length,
-        conversionRate: 0,
-        recentContacts: submissions.slice(0, 5)
-      };
-
-      setDashboardData(updatedDashboardData);
-      setContacts(submissions);
-    } else {
-      setError('Failed to load dashboard data');
+    // Contacts + dashboard are critical — show error only if both fail
+    if (!dashboardData.success && !contactsData.success) {
+      setError('Could not reach the server. Check your connection or try again.');
+      setLoading(false);
+      return;
     }
-  } catch (error) {
-    setError('Dashboard API not available - using demo mode');
-    // Set demo data for development
+
+    const submissions = contactsData.success ? (contactsData.data?.submissions || []) : [];
+    const analytics = analyticsData.success ? (analyticsData.data || {}) : {};
+    const calculatorLeads = submissions.filter((s) => s.source === 'calculator_quote');
+
     setDashboardData({
-      totalVisits: 0,
-      calculatorPageVisits: 0,
-      uniqueVisitors: 0,
-      calculatorUniqueVisitors: 0,
-      recentCalculatorUsers: [],
-      hitsToday: 0,
-      dailyHits: [],
-      calculatorHitsToday: 0,
-      dailyCalculatorHits: [],
-      calculatorLeads: [],
-      totalContacts: 0,
+      ...(dashboardData.data || {}),
+      totalVisits: analytics.totalVisits || 0,
+      calculatorPageVisits: analytics.calculatorPageVisits || 0,
+      uniqueVisitors: analytics.uniqueVisitors || 0,
+      calculatorUniqueVisitors: analytics.calculatorUniqueVisitors || 0,
+      recentCalculatorUsers: analytics.recentCalculatorUsers || [],
+      hitsToday: analytics.hitsToday || 0,
+      dailyHits: analytics.dailyHits || [],
+      calculatorHitsToday: analytics.calculatorHitsToday || 0,
+      dailyCalculatorHits: analytics.dailyCalculatorHits || [],
+      calculatorLeads,
+      totalContacts: submissions.length,
       conversionRate: 0,
-      recentContacts: []
+      recentContacts: submissions.slice(0, 5),
     });
-  } finally {
+    setContacts(submissions);
+
+    if (!analyticsData.success) {
+      setError('Analytics data unavailable — contacts and leads loaded fine.');
+    }
+
     setLoading(false);
-  }
-};
+  };
 
   const loadContacts = async () => {
     setLoading(true);
