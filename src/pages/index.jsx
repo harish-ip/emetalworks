@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '../components/ui/button.jsx';
 import { Card, CardContent, CardTitle, CardDescription } from '../components/ui/card.jsx';
@@ -13,6 +13,7 @@ import {
   getSessionInfo
 } from '../utils/analytics';
 import { DEFAULT_PRICING, fetchPricing } from '../utils/pricing';
+import { calculateBalconyGrill, BALCONY_CONFIG } from '../utils/balconyCalc.js';
 
 // Service Icons
 const ServiceIcons = {
@@ -198,6 +199,9 @@ export default function HomePage() {
 
   // Advanced calculator state
   const [showAdvancedCalculator, setShowAdvancedCalculator] = useState(false);
+  const [balconyCheck, setBalconyCheck] = useState('4');
+  const [balconyType, setBalconyType] = useState('box');
+  const [showBalconyWorking, setShowBalconyWorking] = useState(false);
   const [customLinearFactor, setCustomLinearFactor] = useState('');
   const [customProfileWeight, setCustomProfileWeight] = useState('');
   const [customProfileSize, setCustomProfileSize] = useState('');
@@ -216,7 +220,7 @@ export default function HomePage() {
     if (typeof serviceType === 'string' && serviceType) {
       // Map service types to grill types
       const serviceToGrillMap = {
-        'Balcony Railings': 'balcony',
+        'Balcony Grills': 'balcony',
         'Window Grills': 'window',
         'Steel Gates': 'gate',
         'Staircase Railings': 'staircase',
@@ -273,7 +277,7 @@ export default function HomePage() {
     window: 6,          // 6 m/m² - Simple window grills with basic grid pattern
     security: 10,       // 10 m/m² - Security grills with closer spacing and reinforcement
     decorative: 8,      // 8 m/m² - Decorative grills with artistic patterns
-    balcony: 7,         // 7 m/m² - Balcony railings with posts and horizontal rails
+    balcony: 7,         // 7 m/m² - Balcony grills (used only by non-balcony path; balcony uses shop formula)
     gate: 12,           // 12 m/m² - Gates with frame, reinforcement, and locking mechanisms
     staircase: 9        // 9 m/m² - Staircase railings with vertical supports and handrails
   };
@@ -515,6 +519,40 @@ export default function HomePage() {
 	        totalRodLengthFt: totalRodLengthFt + frameLengthFt
 	      }
 	    };
+	  } else if (grillType === 'balcony') {
+	    // SHOP FORMULA — angle frame + square rod infill, per-unit then scaled by qty
+	    const W_in = widthInCm / 2.54;
+	    const H_in = heightInCm / 2.54;
+	    const balconyResult = calculateBalconyGrill({
+	      W_in,
+	      H_in,
+	      qty: numericQuantity,
+	      check: parseInt(balconyCheck, 10),
+	      type: balconyType,
+	    });
+	    const widthFt = widthInCm / 30.48;
+	    const heightFt = heightInCm / 30.48;
+	    const areaSqFt = widthFt * heightFt * numericQuantity;
+	    const grillAreaSqMeters = (widthInCm / 100) * (heightInCm / 100) * numericQuantity;
+	    const totalLengthMeters = (balconyResult.breakdown.totalLengthIn / 39.3701) * numericQuantity;
+	    const totalWeight = balconyResult.total.weightKg;
+	    const { cost, materialCost, laborCost, designCost, minimumApplied } = getInstalledProjectCost(totalWeight, areaSqFt);
+	    return {
+	      weight: totalWeight,
+	      cost,
+	      materialCost,
+	      laborCost,
+	      designCost,
+	      minimumApplied,
+	      totalBarLength: 0,
+	      numberOfBars: balconyResult.breakdown.nVert + balconyResult.breakdown.nHorz,
+	      wastageWeight: totalWeight * (BALCONY_CONFIG.WASTAGE_PCT / 100) / (1 + BALCONY_CONFIG.WASTAGE_PCT / 100),
+	      totalLinearMeters: totalLengthMeters,
+	      linearFactor: 0,
+	      profileWeight: 0,
+	      grillAreaSqMeters,
+	      balconyBreakdown: balconyResult,
+	    };
 	  } else if (showAdvancedCalculator) {
 	    // PRACTICAL FABRICATION FORMULA (per unit, then scaled by quantity)
       // Step 1: Calculate area in square feet
@@ -625,7 +663,7 @@ export default function HomePage() {
 	  }
 	};
 
-  const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters, minimumApplied } = calculateResults();
+  const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters, minimumApplied, balconyBreakdown } = calculateResults();
 
   // Track calculator usage when values change (debounced so partially-typed
   // dimensions don't flood the analytics with bogus entries)
@@ -1050,7 +1088,7 @@ export default function HomePage() {
                   <div className="grid gap-5 md:grid-cols-3">
                     {[
                       ['One-stop fabrication', 'Design, material selection, workshop fabrication and installation handled by one local team.'],
-                      ['Built for real homes', 'Gates, window grills, balcony railings, staircases, sheds and shopfront work tailored to site measurements.'],
+                      ['Built for real homes', 'Gates, window grills, balcony grills, staircases, sheds and shopfront work tailored to site measurements.'],
                       ['Estimate before commitment', 'Use the calculator to get a practical starting range, then send dimensions for a final quote.']
                     ].map(([title, text]) => (
                       <div key={title} className="rounded-lg border border-steel-200 bg-white p-5">
@@ -1164,7 +1202,7 @@ export default function HomePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {[
                     {
-                      title: "Balcony Railings",
+                      title: "Balcony Grills",
                       desc: "Modern and secure designs that enhance your home's aesthetic while ensuring safety and durability.",
                       icon: ServiceIcons.railing,
                       color: "primary"
@@ -1353,7 +1391,7 @@ export default function HomePage() {
                       { value: 'window', name: 'Window Grills', icon: GrillTypeIcons.window },
                       { value: 'security', name: 'Security Grills', icon: GrillTypeIcons.security },
                       { value: 'decorative', name: 'Decorative Grills', icon: GrillTypeIcons.decorative },
-                      { value: 'balcony', name: 'Balcony Railings', icon: GrillTypeIcons.balcony },
+                      { value: 'balcony', name: 'Balcony Grills', icon: GrillTypeIcons.balcony },
                       { value: 'gate', name: 'Gate Grills', icon: GrillTypeIcons.gate },
                       { value: 'staircase', name: 'Staircase Railings', icon: GrillTypeIcons.staircase }
                     ].map((type) => (
@@ -1389,6 +1427,59 @@ export default function HomePage() {
                     <option className="bg-slate-800" value="stainless">Stainless Steel 304 - premium, low maintenance</option>
                   </select>
                   <p className="text-xs text-slate-500 mb-6">Mild steel usually needs paint. Stainless steel costs more but is easier to maintain.</p>
+
+                  {/* Balcony-specific options — only shown when Balcony Grills is selected */}
+                  {grillType === 'balcony' && (
+                    <div className="mb-6 space-y-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Grill Style</p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'box', label: 'Box (Projecting)', desc: 'Extends outward 15″ per side — common style' },
+                            { value: 'plain', label: 'Plain (Flat)', desc: 'Flush with wall, simpler construction' },
+                          ].map(({ value, label, desc }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setBalconyType(value)}
+                              className={`text-left p-3 rounded-xl border transition-all duration-200 ${
+                                balconyType === value
+                                  ? 'border-accent-400 bg-accent-400/20 text-accent-300'
+                                  : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:border-white/30'
+                              }`}
+                            >
+                              <p className="text-sm font-semibold">{label}</p>
+                              <p className="text-xs opacity-70 mt-0.5 leading-snug">{desc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Check Size (bar gap)</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[
+                            { value: '3', label: '3″', desc: 'Fine / tight' },
+                            { value: '4', label: '4″', desc: 'Standard' },
+                            { value: '5', label: '5″', desc: 'Open / light' },
+                          ].map(({ value, label, desc }) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setBalconyCheck(value)}
+                              className={`text-center p-3 rounded-xl border transition-all duration-200 ${
+                                balconyCheck === value
+                                  ? 'border-accent-400 bg-accent-400/20 text-accent-300'
+                                  : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:border-white/30'
+                              }`}
+                            >
+                              <p className="text-sm font-semibold">{label}</p>
+                              <p className="text-xs opacity-70">{desc}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Live estimate — conditional */}
                   {(widthInCm > 0 && heightInCm > 0) ? (
@@ -1436,7 +1527,7 @@ export default function HomePage() {
                       <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
                         {[
                           ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
-                          ['Section', {
+                          ['Section', grillType === 'balcony' ? 'MS Angle + 10mm Sq Rod' : ({
                             square: 'Square Pipe',
                             square_heavy: 'Heavy Square Pipe',
                             round: 'Round Pipe',
@@ -1447,7 +1538,7 @@ export default function HomePage() {
                             sq_rod_8mm: '8mm Square Rod',
                             sq_rod_10mm: '10mm Square Rod',
                             sq_rod_12mm: '12mm Square Rod'
-                          }[profileType] || 'Standard Profile'],
+                          }[profileType] || 'Standard Profile')],
                           ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
                           ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`]
                         ].map(([label, value]) => (
@@ -1457,6 +1548,44 @@ export default function HomePage() {
                           </div>
                         ))}
                       </div>
+
+                      {/* Show working — balcony only */}
+                      {grillType === 'balcony' && balconyBreakdown && (
+                        <div className="mt-4">
+                          <button
+                            type="button"
+                            onClick={() => setShowBalconyWorking(v => !v)}
+                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
+                          >
+                            <svg className={`w-3 h-3 transition-transform ${showBalconyWorking ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            {showBalconyWorking ? 'Hide' : 'Show'} working
+                          </button>
+                          {showBalconyWorking && (
+                            <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-4 text-xs space-y-1.5">
+                              <p className="font-semibold text-slate-200 mb-2">Calculation breakdown (per unit)</p>
+                              {[
+                                ['Style', balconyBreakdown.breakdown.type === 'box'
+                                  ? `Box — plan ${balconyBreakdown.breakdown.Wg.toFixed(0)}″ × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`
+                                  : 'Plain'],
+                                ['Check / pitch', `${balconyBreakdown.breakdown.checkIn}″ check → ${balconyBreakdown.breakdown.pitchIn}″ pitch`],
+                                ['Frame (angle iron)', `${(balconyBreakdown.breakdown.Lframe_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.frameKg.toFixed(1)} kg`],
+                                ['Vertical bars', `${balconyBreakdown.breakdown.nVert} × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`],
+                                ['Horizontal bars', `${balconyBreakdown.breakdown.nHorz} × ${balconyBreakdown.breakdown.Wg.toFixed(0)}″`],
+                                ['Rod total', `${(balconyBreakdown.breakdown.Lrod_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.rodKg.toFixed(1)} kg`],
+                                ['Per unit (+ 5% wastage)', `${balconyBreakdown.perUnit.weightKg.toFixed(1)} kg`],
+                                ['Total weight', `${numericQuantity} × ${balconyBreakdown.perUnit.weightKg.toFixed(1)} = ${balconyBreakdown.total.weightKg.toFixed(1)} kg`],
+                              ].map(([k, v]) => (
+                                <div key={k} className="flex justify-between gap-2">
+                                  <span className="text-slate-400 shrink-0">{k}</span>
+                                  <span className="text-slate-200 text-right">{v}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       <div className="mt-6 space-y-3">
                         <button
@@ -1550,7 +1679,7 @@ export default function HomePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                   {[
                     {
-                      title: "Modern Balcony Railings",
+                      title: "Modern Balcony Grills",
                       category: "Residential",
                       description: "Powder-coated MS railings fabricated to site measurements for balconies and stair landings.",
                       image: "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800&h=600&fit=crop&crop=center"
@@ -1751,7 +1880,7 @@ export default function HomePage() {
 	                              <option value="window_grill">Window Grills</option>
 	                              <option value="security_grill">Security Grills</option>
 	                              <option value="decorative_grill">Decorative Grills</option>
-	                              <option value="balcony_grill">Balcony Railings</option>
+	                              <option value="balcony_grill">Balcony Grills</option>
 	                              <option value="railing">General Railings</option>
 	                              <option value="gate">Gates</option>
 	                              <option value="shed">Sheds</option>
