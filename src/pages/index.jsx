@@ -2032,7 +2032,7 @@ export default function HomePage() {
                   type="text"
                   value={waName}
                   onChange={e => setWaName(e.target.value)}
-                  placeholder="e.g. Rajesh Kumar"
+                  placeholder="e.g. Siva"
                   required
                   className="w-full rounded-xl border border-steel-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
                   autoFocus

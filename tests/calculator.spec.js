@@ -52,7 +52,7 @@ test.describe('Calculator Scenarios', () => {
     await expect(page.locator('text=Enter your name and number')).toBeVisible();
 
     // Fill the modal form
-    await page.fill('input[placeholder="e.g. Rajesh Kumar"]', 'Test User');
+    await page.fill('input[placeholder="e.g. Siva"]', 'Test User');
     await page.fill('input[placeholder="e.g. 9876543210"]', '9876543210');
 
     // Submit — button should be enabled now
