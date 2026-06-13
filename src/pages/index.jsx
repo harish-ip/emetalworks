@@ -1175,7 +1175,7 @@ export default function HomePage() {
                       size="lg"
                       onClick={() => goToCalculator()}
                     >
-                      Get an Estimate
+                      Get Free Estimate
                     </Button>
                   </div>
                 </div>
