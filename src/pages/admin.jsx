@@ -236,6 +236,8 @@ export default function AdminDashboard() {
     extraCost: '0'
   });
 
+  const [quoteContact, setQuoteContact] = useState(null);
+
   // Centralized pricing — same rates the public website calculator uses.
   const [pricing, setPricing] = useState(DEFAULT_PRICING);
   const [pricingDraft, setPricingDraft] = useState(pricingToDraft(DEFAULT_PRICING));
@@ -284,6 +286,37 @@ export default function AdminDashboard() {
       material,
       finishingRate: String(pricing.finishingRates[material] ?? prev.finishingRate)
     }));
+  };
+
+  const loadContactIntoQuote = (contact) => {
+    const cd = contact.calculatorData;
+    if (cd) {
+      const toFt = (val, unit) => {
+        if (!val) return null;
+        if (unit === 'cm') return (val / 30.48).toFixed(2);
+        if (unit === 'in') return (val / 12).toFixed(2);
+        return String(val);
+      };
+      const grillTypeMap = { window: 'window', window_grill: 'window', security: 'security', security_grill: 'security', decorative: 'decorative', decorative_grill: 'decorative', balcony: 'balcony', balcony_grill: 'balcony', gate: 'gate', staircase: 'staircase' };
+      const profileMap = { square: 'square', round: 'round', angle: 'angle', sq_rod_10mm: 'sq_rod_10mm', sq_rod_8mm: 'sq_rod_8mm', sq_rod_12mm: 'sq_rod_12mm' };
+      const workType = grillTypeMap[cd.grillType] || 'window';
+      const material = cd.metalType === 'stainless' ? 'stainless' : 'steel';
+      const width = toFt(cd.dimensions?.width, cd.dimensions?.widthUnit);
+      const height = toFt(cd.dimensions?.height, cd.dimensions?.heightUnit);
+      setQuoteForm((prev) => ({
+        ...prev,
+        workType,
+        material,
+        ...(width ? { width } : {}),
+        ...(height ? { height } : {}),
+        quantity: cd.quantity ? String(cd.quantity) : '1',
+        profile: profileMap[cd.profileType] || 'sq_rod_10mm',
+        finishingRate: String(pricing.finishingRates[material] ?? prev.finishingRate),
+        installRate: String(pricing.installationRates[workType] ?? prev.installRate),
+      }));
+    }
+    setQuoteContact(contact);
+    setActiveView('quotation');
   };
 
   const setDraftRate = (group, key, value) => {
@@ -1080,7 +1113,23 @@ export default function AdminDashboard() {
                                 {contact.phone || '—'}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-steel-700">
-                                {contact.subject || contact.workType || contact.projectType || '—'}
+                                <div>{contact.subject || contact.workType || contact.projectType || '—'}</div>
+                                {contact.calculatorData && (() => {
+                                  const cd = contact.calculatorData;
+                                  return (
+                                    <div className="mt-1 space-y-0.5 text-xs text-steel-500">
+                                      {cd.dimensions?.width && cd.dimensions?.height && (
+                                        <div>📐 {cd.dimensions.width} {cd.dimensions.widthUnit || 'ft'} × {cd.dimensions.height} {cd.dimensions.heightUnit || 'ft'}{cd.quantity > 1 ? ` × ${cd.quantity}` : ''}</div>
+                                      )}
+                                      {(cd.grillType || cd.metalType || cd.profileType) && (
+                                        <div>🔩 {[cd.grillType, cd.metalType, cd.profileType].filter(Boolean).map(s => s.replace(/_/g, ' ')).join(' · ')}</div>
+                                      )}
+                                      {cd.estimatedCost && (
+                                        <div className="font-medium text-primary-700">₹{Math.round(cd.estimatedCost).toLocaleString('en-IN')} est.</div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </td>
                               <td className="px-4 py-3 align-top text-sm text-steel-600 max-w-xs">
                                 <p className="line-clamp-3 whitespace-pre-wrap break-words">
@@ -1102,30 +1151,42 @@ export default function AdminDashboard() {
                                 </select>
                               </td>
                               <td className="px-4 py-3 align-top">
-                                {normalizePhone(contact.phone) ? (
-                                  <div className="flex items-center gap-2">
-                                    <a
-                                      href={whatsAppHref(contact)}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={() => markContacted(contact)}
-                                      title="Message on WhatsApp with their requirement prefilled"
-                                      className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1ebe5b] whitespace-nowrap"
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {normalizePhone(contact.phone) ? (
+                                    <>
+                                      <a
+                                        href={whatsAppHref(contact)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={() => markContacted(contact)}
+                                        title="Message on WhatsApp with their requirement prefilled"
+                                        className="inline-flex items-center gap-1 rounded-lg bg-[#25D366] px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-[#1ebe5b] whitespace-nowrap"
+                                      >
+                                        WhatsApp
+                                      </a>
+                                      <a
+                                        href={telHref(contact)}
+                                        onClick={() => markContacted(contact)}
+                                        title="Call this customer"
+                                        className="inline-flex items-center gap-1 rounded-lg border border-steel-300 px-2.5 py-1.5 text-xs font-semibold text-steel-700 hover:bg-steel-50 whitespace-nowrap"
+                                      >
+                                        📞 Call
+                                      </a>
+                                    </>
+                                  ) : (
+                                    <span className="text-xs text-steel-400">No phone</span>
+                                  )}
+                                  {contact.calculatorData && (
+                                    <button
+                                      type="button"
+                                      onClick={() => loadContactIntoQuote(contact)}
+                                      title="Open in Quote Builder with pre-filled dimensions"
+                                      className="inline-flex items-center gap-1 rounded-lg border border-primary-400 bg-primary-50 px-2.5 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-100 whitespace-nowrap"
                                     >
-                                      WhatsApp
-                                    </a>
-                                    <a
-                                      href={telHref(contact)}
-                                      onClick={() => markContacted(contact)}
-                                      title="Call this customer"
-                                      className="inline-flex items-center gap-1 rounded-lg border border-steel-300 px-2.5 py-1.5 text-xs font-semibold text-steel-700 hover:bg-steel-50 whitespace-nowrap"
-                                    >
-                                      📞 Call
-                                    </a>
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-steel-400">No phone</span>
-                                )}
+                                      📋 Quote
+                                    </button>
+                                  )}
+                                </div>
                               </td>
                               <td className="px-4 py-3 align-top">
                                 <Button
@@ -1614,6 +1675,26 @@ export default function AdminDashboard() {
 
         {activeView === 'quotation' && (
           <div className="space-y-6">
+            {quoteContact && (
+              <div className="flex items-center justify-between rounded-xl bg-primary-50 border border-primary-200 px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-lg">👤</span>
+                  <div>
+                    <span className="font-semibold text-primary-900 text-sm">{quoteContact.name}</span>
+                    {quoteContact.phone && <span className="ml-2 text-primary-700 text-sm">{quoteContact.phone}</span>}
+                    {quoteContact.email && <span className="ml-2 text-xs text-primary-500">{quoteContact.email}</span>}
+                    <div className="text-xs text-primary-400 mt-0.5">Dimensions pre-filled from their calculator submission</div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setQuoteContact(null)}
+                  className="text-primary-400 hover:text-primary-700 text-sm px-2 py-1"
+                >
+                  ✕ Clear
+                </button>
+              </div>
+            )}
             {/* ===== Quote Builder: form left, live summary right ===== */}
             <div className="grid grid-cols-1 xl:grid-cols-5 gap-6 items-start">
               <div className="xl:col-span-3 bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
