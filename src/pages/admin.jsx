@@ -582,6 +582,18 @@ export default function AdminDashboard() {
     setContacts([]);
   };
 
+  const deleteContact = async (contact) => {
+    const contactId = getContactId(contact);
+    if (!window.confirm(`Delete lead for ${contact.name} (${contact.phone})? This cannot be undone.`)) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}`, {
+        method: 'DELETE',
+        headers: { ...authHeader() }
+      });
+      setContacts((prev) => prev.filter((c) => getContactId(c) !== contactId));
+    } catch (_) {}
+  };
+
   const updateContactStatus = async (contactId, status) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/contact/submission/${contactId}/status`, {
@@ -1216,6 +1228,14 @@ export default function AdminDashboard() {
                                 >
                                   📝 Notes{noteCount ? ` (${noteCount})` : ''}
                                 </Button>
+                                <button
+                                  type="button"
+                                  onClick={() => deleteContact(contact)}
+                                  title="Delete this lead permanently"
+                                  className="mt-1 inline-flex items-center gap-1 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 whitespace-nowrap"
+                                >
+                                  🗑 Delete
+                                </button>
                               </td>
                             </tr>
                           );

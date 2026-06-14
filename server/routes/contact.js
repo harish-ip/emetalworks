@@ -432,4 +432,20 @@ router.get('/analytics', async (req, res) => {
   }
 });
 
+// DELETE /api/contact/submission/:id - Delete a contact submission (admin only)
+router.delete('/submission/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleted = await ContactSubmission.findByIdAndDelete(id);
+    if (!deleted) {
+      return res.status(404).json({ success: false, message: 'Submission not found' });
+    }
+    console.log(`🗑️  Contact deleted: ${deleted.name} (${deleted.phone})`);
+    res.json({ success: true, message: 'Submission deleted' });
+  } catch (error) {
+    console.error('Error deleting contact submission:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete submission', error: error.message });
+  }
+});
+
 module.exports = router;
