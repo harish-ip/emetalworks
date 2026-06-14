@@ -5,6 +5,7 @@ import { Card, CardContent, CardTitle } from '../components/ui/card.jsx';
 import { Button } from '../components/ui/button.jsx';
 import { Input } from '../components/ui/input.jsx';
 import { DEFAULT_PRICING, fetchPricing, savePricing } from '../utils/pricing.js';
+import { calculateBalconyGrill, BALCONY_CONFIG } from '../utils/balconyCalc.js';
 
 const resolveApiBaseUrl = () => {
   const envUrl = import.meta.env.VITE_API_URL;
@@ -146,7 +147,7 @@ const WORK_TYPE_LABELS = {
   window: 'Window Grills',
   security: 'Security Grills',
   decorative: 'Decorative Grills',
-  balcony: 'Balcony Railings',
+  balcony: 'Balcony Grills',
   gate: 'Gate Grills',
   staircase: 'Staircase Railings'
 };
@@ -233,7 +234,9 @@ export default function AdminDashboard() {
     wastage: '7',
     finishingRate: '45',
     installRate: '55',
-    extraCost: '0'
+    extraCost: '0',
+    balconyCheck: '4',
+    balconyType: 'box'
   });
 
   const [quoteContact, setQuoteContact] = useState(null);
@@ -368,26 +371,39 @@ export default function AdminDashboard() {
     let verticalBars = 0;
     let horizontalBars = 0;
 
+    let totalWeight = 0;
+
     if (quoteForm.workType === 'window') {
       verticalBars = Math.max(2, Math.ceil((width * 12) / (parseFloat(quoteForm.spacing) || 4)));
       horizontalBars = Math.max(2, Math.ceil((height * 12) / (parseFloat(quoteForm.hSpacing) || 24)));
       const rodLengthFt = (verticalBars * height + horizontalBars * width) * quantity;
       const frameLengthFt = 2 * (width + height) * quantity;
       linearMeters = (rodLengthFt + frameLengthFt) * 0.3048;
+      const baseWeight = linearMeters * profileWeight;
+      totalWeight = baseWeight + baseWeight * (wastagePercent / 100);
+    } else if (quoteForm.workType === 'balcony') {
+      const balconyResult = calculateBalconyGrill({
+        W_in: width * 12,
+        H_in: height * 12,
+        qty: quantity,
+        check: parseInt(quoteForm.balconyCheck, 10) || 4,
+        type: quoteForm.balconyType || 'box'
+      });
+      totalWeight = balconyResult.total.weightKg;
+      verticalBars = balconyResult.breakdown.nVert;
+      horizontalBars = balconyResult.breakdown.nHorz;
+      linearMeters = (balconyResult.breakdown.totalLengthIn / 39.3701) * quantity;
     } else {
       const linearFactor = {
         security: 10,
         decorative: 8,
-        balcony: 7,
         gate: 12,
         staircase: 9
       }[quoteForm.workType] || 7;
       linearMeters = areaSqFt * 0.092903 * linearFactor;
+      const baseWeight = linearMeters * profileWeight;
+      totalWeight = baseWeight + baseWeight * (wastagePercent / 100);
     }
-
-    const baseWeight = linearMeters * profileWeight;
-    const wastageWeight = baseWeight * (wastagePercent / 100);
-    const totalWeight = baseWeight + wastageWeight;
     const materialCost = totalWeight * materialRate;
     const fabricationCost = totalWeight * fabricationRate * complexity;
     const finishingCost = areaSqFt * finishingRate;
@@ -1724,7 +1740,7 @@ export default function AdminDashboard() {
                           <option value="window">Window Grills</option>
                           <option value="security">Security Grills</option>
                           <option value="decorative">Decorative Grills</option>
-                          <option value="balcony">Balcony Railings</option>
+                          <option value="balcony">Balcony Grills</option>
                           <option value="gate">Gate Grills</option>
                           <option value="staircase">Staircase Railings</option>
                         </select>
@@ -1780,6 +1796,40 @@ export default function AdminDashboard() {
                           <Input label="Horizontal Bar Gap (in)" type="number" step="1" value={quoteForm.hSpacing} onChange={(e) => setQuoteForm({ ...quoteForm, hSpacing: e.target.value })} />
                         </>
                       )}
+                      {quoteForm.workType === 'balcony' && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-steel-700 mb-2">Grill Style</label>
+                            <div className="grid grid-cols-2 gap-2">
+                              {[['box', 'Box'], ['plain', 'Plain']].map(([val, label]) => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => setQuoteForm({ ...quoteForm, balconyType: val })}
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${quoteForm.balconyType === val ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-steel-700 border-steel-300 hover:bg-steel-50'}`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-steel-700 mb-2">Check Size</label>
+                            <div className="grid grid-cols-3 gap-2">
+                              {['3', '4', '5'].map((val) => (
+                                <button
+                                  key={val}
+                                  type="button"
+                                  onClick={() => setQuoteForm({ ...quoteForm, balconyCheck: val })}
+                                  className={`px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${quoteForm.balconyCheck === val ? 'bg-primary-600 text-white border-primary-600' : 'bg-white text-steel-700 border-steel-300 hover:bg-steel-50'}`}
+                                >
+                                  {val}″
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
                       <Input label="Wastage (%)" type="number" step="1" value={quoteForm.wastage} onChange={(e) => setQuoteForm({ ...quoteForm, wastage: e.target.value })} />
                       <Input label="Finish Rate (₹/sq.ft)" type="number" step="5" value={quoteForm.finishingRate} onChange={(e) => setQuoteForm({ ...quoteForm, finishingRate: e.target.value })} />
                       <Input label="Install Rate (₹/sq.ft)" type="number" step="5" value={quoteForm.installRate} onChange={(e) => setQuoteForm({ ...quoteForm, installRate: e.target.value })} />
@@ -1794,6 +1844,17 @@ export default function AdminDashboard() {
                       </svg>
                       <p className="text-sm text-primary-900">
                         Bar layout per unit: <strong>{adminQuote.verticalBars} vertical + {adminQuote.horizontalBars} horizontal</strong> {PROFILE_LABELS[quoteForm.profile] || quoteForm.profile} bars, plus angle frame on all four sides.
+                      </p>
+                    </div>
+                  )}
+                  {quoteForm.workType === 'balcony' && (
+                    <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-100 p-4">
+                      <svg className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <p className="text-sm text-amber-900">
+                        Shop formula: 25×25×3mm MS angle frame + 10mm sq rod infill at <strong>{quoteForm.balconyCheck}″ check</strong>, <strong>{quoteForm.balconyType}</strong> style.
+                        Rod grid: <strong>{adminQuote.verticalBars}V + {adminQuote.horizontalBars}H</strong> bars per unit.
                       </p>
                     </div>
                   )}
