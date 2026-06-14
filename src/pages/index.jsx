@@ -937,8 +937,17 @@ export default function HomePage() {
       <section className="py-8 sm:py-12 lg:py-16 px-4 sm:px-6 lg:px-8">
         <div className="container mx-auto max-w-7xl">
           {/* Tab Navigation */}
-          <div className="mb-8 sm:mb-12">
-            <div className="flex gap-1 xs:gap-2 sm:gap-4 lg:gap-6 xl:gap-8 p-1 xs:p-2 sm:p-3 livspace-tabs rounded-2xl overflow-x-auto scrollbar-hide w-full">
+          <div className="mb-8 sm:mb-12 flex items-center gap-3 sm:gap-4">
+            {/* Brand mark — hidden on mobile to preserve tab space */}
+            <button
+              type="button"
+              onClick={() => handleTabSwitch('home')}
+              className="hidden sm:block shrink-0 focus:outline-none"
+              aria-label="Go to home"
+            >
+              <img src="/favicon.svg" alt="eMetal Works" className="w-11 h-11 rounded-2xl shadow-sm" />
+            </button>
+            <div className="flex-1 flex gap-1 xs:gap-2 sm:gap-4 lg:gap-6 xl:gap-8 p-1 xs:p-2 sm:p-3 livspace-tabs rounded-2xl overflow-x-auto scrollbar-hide">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -1305,9 +1314,7 @@ export default function HomePage() {
 
                   {/* Header */}
                   <div className="flex items-center gap-3 mb-6 pb-6 border-b border-white/10">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center font-display font-extrabold text-xl shadow-lg">
-                      eM
-                    </div>
+                    <img src="/favicon.svg" alt="eMetalWorks" className="w-12 h-12 rounded-2xl shadow-lg" />
                     <div>
                       <h2 className="text-2xl font-display font-bold leading-tight">
                         eMetal <span className="text-accent-400">Calculator</span>
@@ -2122,10 +2129,17 @@ export default function HomePage() {
         <div className="container mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="mb-4">
-              <h3 className="text-xl font-bold text-primary-400 mb-2">eMetalWorks</h3>
-              <p className="text-steel-300 text-sm">
-                Premium Steel Fabrication & Custom Metalwork Solutions
-              </p>
+              <div className="flex items-center justify-center gap-3">
+                <img
+                  src="/logo.svg"
+                  alt="eMetalWorks icon"
+                  className="h-14 w-14 rounded-xl"
+                />
+                <div className="text-left">
+                  <div className="text-xl font-bold text-white">eMetalWorks</div>
+                  <div className="text-xs text-slate-400 tracking-wide">Fabrication For Every Home</div>
+                </div>
+              </div>
             </div>
             <div className="border-t border-steel-700 pt-4">
               <p className="text-steel-400 text-sm">
