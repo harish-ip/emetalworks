@@ -2208,6 +2208,21 @@ export default function HomePage() {
           </div>
         </div>
       )}
+
+      {/* Floating CTA — mobile only, hidden once user is on the calculator tab */}
+      {activeTab !== 'calculator' && (
+        <div className="fixed bottom-5 left-0 right-0 flex justify-center z-40 md:hidden pointer-events-none">
+          <button
+            onClick={() => handleTabSwitch('calculator')}
+            className="pointer-events-auto flex items-center gap-2 rounded-full bg-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg hover:bg-blue-700 active:scale-95 transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 11h.01M12 11h.01M15 11h.01M4 19h16a2 2 0 002-2V7a2 2 0 00-2-2H4a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            Get Free Estimate
+          </button>
+        </div>
+      )}
     </main>
   );
 }
