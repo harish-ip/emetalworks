@@ -540,7 +540,7 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/contact/submissions`, {
+      const response = await fetch(`${API_BASE_URL}/api/contact/submissions?limit=200`, {
         headers: {
           ...authHeader(),
         }

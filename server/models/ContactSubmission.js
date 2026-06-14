@@ -20,7 +20,8 @@ const contactSubmissionSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Phone number is required'],
     trim: true,
-    match: [/^[\+]?[0-9][0-9\s-]{7,20}$/, 'Please enter a valid phone number']
+    minlength: [6, 'Phone number too short'],
+    maxlength: [30, 'Phone number too long']
   },
   
   // Message details
@@ -77,12 +78,14 @@ const contactSubmissionSchema = new mongoose.Schema({
   // Tracking information
   sessionId: {
     type: String,
-    required: true,
+    required: false,
+    default: '',
     index: true
   },
   visitorId: {
     type: String,
-    required: true,
+    required: false,
+    default: '',
     index: true
   },
   

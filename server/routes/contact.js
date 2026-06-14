@@ -35,11 +35,11 @@ const contactSchema = Joi.object({
 
 // Minimal schema for WhatsApp quote leads (name + phone only)
 const whatsappLeadSchema = Joi.object({
-  name: Joi.string().trim().min(2).max(100).required(),
-  phone: Joi.string().pattern(/^[\+]?[0-9][0-9\s-]{7,20}$/).required(),
+  name: Joi.string().trim().min(1).max(100).required(),
+  phone: Joi.string().trim().min(6).max(30).required(),
   calculatorData: Joi.object().unknown(true).allow(null).optional(),
-  sessionId: Joi.string().required(),
-  visitorId: Joi.string().required()
+  sessionId: Joi.string().optional().allow(''),
+  visitorId: Joi.string().optional().allow('')
 });
 
 // POST /api/contact/whatsapp-lead - Capture name+phone before opening WhatsApp
