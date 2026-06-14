@@ -545,10 +545,6 @@ export default function AdminDashboard() {
     });
     setContacts(submissions);
 
-    if (!analyticsData.success) {
-      setError('Analytics data unavailable — contacts and leads loaded fine.');
-    }
-
     setLoading(false);
   };
 

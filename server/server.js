@@ -54,6 +54,12 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
+// Trust the first proxy hop (Render's load balancer) so rate limiters
+// see the real client IP from X-Forwarded-For, not the proxy's internal IP.
+// Without this, all traffic appears as one IP and the analytics limiter
+// trips for everyone once 600 combined beacons are sent.
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 app.use(cors(corsOptions));
@@ -64,28 +70,22 @@ app.options('*', cors(corsOptions));
 // protects real user actions (e.g. contact form submit) — otherwise a busy
 // visitor could get rate-limited out of submitting a quote.
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs
-  message: {
-    error: 'Too many requests from this IP, please try again later.'
-  },
-  // GET /api/pricing is fetched on every page load (like analytics), so it
-  // must not consume the budget that protects real user actions either.
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  message: { error: 'Too many requests from this IP, please try again later.' },
   skip: (req) =>
     req.originalUrl.startsWith('/api/analytics') ||
     (req.method === 'GET' && req.originalUrl.startsWith('/api/pricing'))
 });
 app.use('/api/', limiter);
 
-// Separate, generous limiter for fire-and-forget analytics beacons. High enough
-// that no real visitor is ever blocked, low enough to bound abuse.
+// Rate limiter for analytics POST beacons only — GET /summary is the admin
+// read endpoint and must never be blocked by visitor traffic.
 const analyticsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 600,
-  message: {
-    success: false,
-    message: 'Too many analytics requests.'
-  }
+  message: { success: false, message: 'Too many analytics requests.' },
+  skip: (req) => req.method === 'GET'
 });
 app.use('/api/analytics', analyticsLimiter);
 
