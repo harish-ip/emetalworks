@@ -167,50 +167,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [dashboardData, setDashboardData] = useState({
-    totalVisits: 0,
-    calculatorPageVisits: 0,
-    uniqueVisitors: 0,
-    calculatorUniqueVisitors: 0,
-    recentCalculatorUsers: [],
-    hitsToday: 0,
-    dailyHits: [],
-    calculatorLeads: [],
-    totalContacts: 38,
-    conversionRate: 0,
-    recentContacts: [
-      {
-        id: 1,
-        name: 'John Smith',
-        email: 'john@example.com',
-        phone: '9876543210',
-        subject: 'Steel Gate Quote',
-        message: 'Need a quote for main gate fabrication',
-        createdAt: new Date().toISOString(),
-        status: 'new'
-      },
-      {
-        id: 2,
-        name: 'Priya Sharma',
-        email: 'priya@example.com',
-        phone: '8765432109',
-        subject: 'Window Grills',
-        message: 'Looking for security grills for 4 windows',
-        createdAt: new Date(Date.now() - 86400000).toISOString(),
-        status: 'contacted'
-      },
-      {
-        id: 3,
-        name: 'Rajesh Kumar',
-        email: 'rajesh@example.com',
-        phone: '7654321098',
-        subject: 'Balcony Railing',
-        message: 'Need decorative railing for balcony',
-        createdAt: new Date(Date.now() - 172800000).toISOString(),
-        status: 'closed'
-      }
-    ]
-  });
+  const [dashboardData, setDashboardData] = useState(null);
   const [contacts, setContacts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -912,105 +869,174 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Dashboard View */}
-        {activeView === 'dashboard' && !dashboardData && !loading && (
-          <div className="text-center py-8">
-            <div className="text-slate-500">No dashboard data available. Press Refresh to reload.</div>
-          </div>
-        )}
-        {activeView === 'dashboard' && dashboardData && (
-          <div className="space-y-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-              {[
-                {
-                  label: 'Total Visits',
-                  value: dashboardData.totalVisits,
-                  chip: 'from-sky-500 to-blue-600',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  )
-                },
-                {
-                  label: 'Visits Today',
-                  value: dashboardData.hitsToday,
-                  chip: 'from-emerald-500 to-green-600',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  )
-                },
-                {
-                  label: 'Calculator Visits',
-                  value: dashboardData.calculatorPageVisits,
-                  chip: 'from-violet-500 to-purple-600',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                    </svg>
-                  )
-                },
-                {
-                  label: 'Quote Leads',
-                  value: (dashboardData.calculatorLeads || []).length,
-                  chip: 'from-amber-500 to-orange-600',
-                  icon: (
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  )
-                }
-              ].map((stat) => (
-                <div key={stat.label} className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
-                  <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.chip} text-white flex items-center justify-center shadow-md mb-3`}>
-                    {stat.icon}
-                  </div>
-                  <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">{stat.value ?? 0}</p>
-                  <p className="text-sm font-medium text-slate-500 mt-1.5">{stat.label}</p>
+        {/* Dashboard View — skeleton while loading */}
+        {activeView === 'dashboard' && loading && (
+          <div className="space-y-6 animate-pulse">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-28">
+                  <div className="w-10 h-10 rounded-xl bg-slate-200 mb-3" />
+                  <div className="h-7 w-16 bg-slate-200 rounded mb-2" />
+                  <div className="h-3 w-24 bg-slate-100 rounded" />
                 </div>
               ))}
             </div>
-
-            {/* Recent Contacts */}
-            <Card>
-              <CardContent className="p-6">
-                <CardTitle className="mb-4">Recent Contacts</CardTitle>
-                <div className="space-y-4">
-                  {dashboardData.recentContacts && dashboardData.recentContacts.length > 0 ? (
-                    dashboardData.recentContacts.map((contact) => (
-                      <div key={getContactId(contact)} className="flex items-center justify-between p-4 bg-steel-50 rounded-lg">
-                        <div>
-                          <p className="font-medium">{contact.name}</p>
-                          <p className="text-sm text-steel-600">{contact.subject}</p>
-                          <p className="text-xs text-steel-500">
-                            {getContactDate(contact) ? new Date(getContactDate(contact)).toLocaleDateString() : ''}
-                          </p>
-                        </div>
-                        <div className={`px-2 py-1 rounded text-xs font-medium ${
-                          contact.status === 'new' ? 'bg-blue-100 text-blue-800' :
-                          contact.status === 'contacted' ? 'bg-yellow-100 text-yellow-800' :
-                          contact.status === 'quoted' ? 'bg-purple-100 text-purple-800' :
-                          contact.status === 'converted' ? 'bg-green-100 text-green-800' :
-                          contact.status === 'closed' ? 'bg-steel-200 text-steel-800' :
-                          contact.status === 'spam' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {contact.status}
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <p className="text-steel-600">No recent contacts</p>
-                  )}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 h-48">
+              <div className="h-4 w-32 bg-slate-200 rounded mb-4" />
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex gap-3 mb-3">
+                  <div className="w-8 h-8 rounded-full bg-slate-200 shrink-0" />
+                  <div className="flex-1 space-y-1.5">
+                    <div className="h-3 w-32 bg-slate-200 rounded" />
+                    <div className="h-3 w-48 bg-slate-100 rounded" />
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
+              ))}
+            </div>
           </div>
         )}
+
+        {/* Dashboard View — real data */}
+        {activeView === 'dashboard' && !loading && dashboardData && (() => {
+          const d = dashboardData;
+          const allContacts = contacts || [];
+          const statusCounts = allContacts.reduce((acc, c) => { acc[c.status || 'new'] = (acc[c.status || 'new'] || 0) + 1; return acc; }, {});
+          const newCount = statusCounts['new'] || 0;
+          const maxBarHits = Math.max(...(d.dailyHits || []).map((h) => h.count), 1);
+          const statusColor = { new: 'bg-blue-100 text-blue-800', contacted: 'bg-yellow-100 text-yellow-800', quoted: 'bg-purple-100 text-purple-800', converted: 'bg-green-100 text-green-800', closed: 'bg-slate-200 text-slate-700', spam: 'bg-red-100 text-red-700' };
+          return (
+            <div className="space-y-6">
+              {/* Stat cards — clickable */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                {[
+                  { label: 'Total Visits', value: d.totalVisits, sub: `${d.hitsToday ?? 0} today`, chip: 'from-sky-500 to-blue-600', onClick: null,
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /> },
+                  { label: 'Calculator Opens', value: d.calculatorPageVisits, sub: `${d.calculatorHitsToday ?? 0} today`, chip: 'from-violet-500 to-purple-600', onClick: null,
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /> },
+                  { label: 'Total Leads', value: allContacts.length, sub: `${newCount} new`, chip: 'from-amber-500 to-orange-500', onClick: () => setActiveView('contacts'),
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /> },
+                  { label: 'New Leads', value: newCount, sub: 'need follow-up', chip: newCount > 0 ? 'from-rose-500 to-red-600' : 'from-emerald-500 to-green-600', onClick: () => { setActiveView('contacts'); setFilterStatus('new'); },
+                    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /> },
+                ].map((stat) => (
+                  <div
+                    key={stat.label}
+                    onClick={stat.onClick}
+                    className={`bg-white rounded-2xl shadow-sm border border-slate-200 p-5 transition-all ${stat.onClick ? 'cursor-pointer hover:shadow-md hover:-translate-y-0.5' : ''}`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${stat.chip} text-white flex items-center justify-center shadow-md mb-3`}>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{stat.icon}</svg>
+                    </div>
+                    <p className="text-2xl sm:text-3xl font-extrabold text-slate-900 leading-none">{stat.value ?? 0}</p>
+                    <p className="text-sm font-medium text-slate-500 mt-1">{stat.label}</p>
+                    {stat.sub && <p className="text-xs text-slate-400 mt-0.5">{stat.sub}</p>}
+                  </div>
+                ))}
+              </div>
+
+              {/* Pipeline + Traffic */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Pipeline at a glance */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-bold text-slate-900">Lead Pipeline</h3>
+                    <button onClick={() => setActiveView('contacts')} className="text-xs text-primary-600 hover:underline">View all →</button>
+                  </div>
+                  <div className="space-y-2">
+                    {[
+                      { key: 'new', label: 'New', bar: 'bg-blue-500' },
+                      { key: 'contacted', label: 'Contacted', bar: 'bg-yellow-400' },
+                      { key: 'quoted', label: 'Quoted', bar: 'bg-purple-500' },
+                      { key: 'converted', label: 'Converted', bar: 'bg-green-500' },
+                      { key: 'closed', label: 'Completed', bar: 'bg-slate-400' },
+                    ].map(({ key, label, bar }) => {
+                      const count = statusCounts[key] || 0;
+                      const pct = allContacts.length > 0 ? (count / allContacts.length) * 100 : 0;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => { setActiveView('contacts'); setFilterStatus(key); }}
+                          className="w-full flex items-center gap-3 group"
+                        >
+                          <span className="text-sm text-slate-600 w-20 text-left group-hover:text-primary-700">{label}</span>
+                          <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${bar} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className="text-sm font-semibold text-slate-700 w-6 text-right">{count}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Daily traffic sparkbar */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                  <h3 className="font-bold text-slate-900 mb-4">Daily Visits (last 14 days)</h3>
+                  {(d.dailyHits || []).length > 0 ? (
+                    <div className="flex items-end gap-1 h-24">
+                      {d.dailyHits.map((hit) => (
+                        <div key={hit.date} className="flex-1 flex flex-col items-center gap-1 group relative" title={`${hit.date}: ${hit.count} visits`}>
+                          <div
+                            className="w-full bg-primary-500 rounded-t hover:bg-primary-600 transition-colors cursor-default"
+                            style={{ height: `${Math.max(4, (hit.count / maxBarHits) * 80)}px` }}
+                          />
+                          <span className="absolute -top-5 left-1/2 -translate-x-1/2 text-[10px] bg-slate-800 text-white px-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">{hit.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="h-24 flex items-center justify-center text-sm text-slate-400">No traffic data yet</div>
+                  )}
+                  {(d.dailyHits || []).length > 0 && (
+                    <div className="flex justify-between mt-2">
+                      <span className="text-xs text-slate-400">{d.dailyHits[0]?.date}</span>
+                      <span className="text-xs text-slate-400">{d.dailyHits[d.dailyHits.length - 1]?.date}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Recent Leads */}
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-bold text-slate-900">Recent Leads</h3>
+                  <button onClick={() => setActiveView('contacts')} className="text-xs text-primary-600 hover:underline">View all →</button>
+                </div>
+                {(d.recentContacts || []).length > 0 ? (
+                  <div className="divide-y divide-slate-100">
+                    {d.recentContacts.map((contact) => (
+                      <div key={getContactId(contact)} className="flex items-center justify-between py-3 gap-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 font-bold text-sm flex items-center justify-center shrink-0">
+                            {contact.name?.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-medium text-slate-900 text-sm">{contact.name}</p>
+                              {contact.source === 'whatsapp_quote' && <span className="text-[10px] bg-[#25D366]/15 text-[#1a9e4d] font-semibold px-1.5 py-0.5 rounded-full">WhatsApp</span>}
+                              {contact.source === 'calculator_quote' && <span className="text-[10px] bg-primary-100 text-primary-700 font-semibold px-1.5 py-0.5 rounded-full">Calculator</span>}
+                            </div>
+                            <p className="text-xs text-slate-500 truncate">{contact.subject} · {contact.phone}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColor[contact.status] || 'bg-slate-100 text-slate-600'}`}>{contact.status || 'new'}</span>
+                          {normalizePhone(contact.phone) && (
+                            <a href={whatsAppHref(contact)} target="_blank" rel="noopener noreferrer" onClick={() => markContacted(contact)} className="text-[#25D366] hover:text-[#1ebe5b]" title="WhatsApp">
+                              <svg viewBox="0 0 32 32" fill="currentColor" className="w-5 h-5"><path d="M16 2C8.28 2 2 8.28 2 16c0 2.46.66 4.88 1.92 7.02L2 30l7.18-1.88A13.93 13.93 0 0016 30c7.72 0 14-6.28 14-14S23.72 2 16 2zm7.1 19.54c-.3.84-1.76 1.6-2.42 1.7-.62.1-1.4.14-2.26-.14a20.8 20.8 0 01-2.04-.76C13.34 21.26 11 18.08 10.82 17.84c-.18-.24-1.48-1.96-1.48-3.74s.94-2.66 1.28-3.02c.34-.36.74-.44 1-.44l.72.01c.23 0 .54-.09.84.64.32.76 1.08 2.62 1.18 2.82.1.2.16.42.02.66-.12.24-.2.4-.38.62l-.57.66c-.18.2-.38.42-.16.82.22.4.98 1.62 2.1 2.62 1.44 1.28 2.66 1.68 3.04 1.86.38.18.6.16.82-.1.24-.26 1-1.16 1.26-1.56.26-.4.52-.34.88-.2.36.14 2.3 1.08 2.7 1.28.38.2.64.3.74.46.08.18.08 1.02-.22 1.86z"/></svg>
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-400 text-sm text-center py-6">No leads yet</p>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Contacts View */}
         {activeView === 'contacts' && (
