@@ -717,40 +717,39 @@ export default function HomePage() {
     setWaModal(true);
   };
 
-  const handleWaSubmit = async (e) => {
+  const handleWaSubmit = (e) => {
     e.preventDefault();
     if (!waName.trim() || !waPhone.trim()) return;
-    setWaSubmitting(true);
-    try {
-      const { sessionId, visitorId } = getSessionInfo();
-      await fetch('/api/contact/whatsapp-lead', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: waName.trim(),
-          phone: waPhone.trim(),
-          calculatorData: cost > 0 ? {
-            dimensions: { width, height, widthUnit, heightUnit },
-            grillType,
-            metalType,
-            profileType,
-            quantity: parseInt(quantity) || 1,
-            estimatedWeight: Math.round(weight),
-            estimatedCost: Math.round(cost),
-            calculatorType: 'rod_based'
-          } : null,
-          sessionId,
-          visitorId
-        })
-      });
-    } catch (_) {
-      // Silently fail — don't block the user from opening WhatsApp
-    }
-    setWaSubmitting(false);
+
+    // Open WhatsApp immediately — never make the user wait for the server
     setWaModal(false);
     setWaName('');
     setWaPhone('');
     window.open(waPendingUrl, '_blank', 'noopener,noreferrer');
+
+    // Fire-and-forget lead capture in the background
+    const { sessionId, visitorId } = getSessionInfo();
+    fetch('/api/contact/whatsapp-lead', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      keepalive: true,
+      body: JSON.stringify({
+        name: waName.trim(),
+        phone: waPhone.trim(),
+        calculatorData: cost > 0 ? {
+          dimensions: { width, height, widthUnit, heightUnit },
+          grillType,
+          metalType,
+          profileType,
+          quantity: parseInt(quantity) || 1,
+          estimatedWeight: Math.round(weight),
+          estimatedCost: Math.round(cost),
+          calculatorType: 'rod_based'
+        } : null,
+        sessionId,
+        visitorId
+      })
+    }).catch(() => {});
   };
 
 	// Handle contact form input changes
