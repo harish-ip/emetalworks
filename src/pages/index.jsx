@@ -14,6 +14,8 @@ import {
 } from '../utils/analytics';
 import { DEFAULT_PRICING, fetchPricing } from '../utils/pricing';
 import { calculateBalconyGrill, BALCONY_CONFIG } from '../utils/balconyCalc.js';
+import { checkCompliance, getCompliantCheckOptions } from '../utils/complianceCheck.js';
+import { buildQuoteRange } from '../config/pricing.js';
 
 // Service Icons
 const ServiceIcons = {
@@ -199,7 +201,7 @@ export default function HomePage() {
 
   // Advanced calculator state
   const [showAdvancedCalculator, setShowAdvancedCalculator] = useState(false);
-  const [balconyCheck, setBalconyCheck] = useState('4');
+  const [balconyCheck, setBalconyCheck] = useState('3');
   const [balconyType, setBalconyType] = useState('box');
   const [showBalconyWorking, setShowBalconyWorking] = useState(false);
   const [customLinearFactor, setCustomLinearFactor] = useState('');
@@ -267,6 +269,7 @@ export default function HomePage() {
   const [waName, setWaName] = useState('');
   const [waPhone, setWaPhone] = useState('');
   const [waSubmitting, setWaSubmitting] = useState(false);
+  const [waConsent, setWaConsent] = useState(false);
   const [waPendingUrl, setWaPendingUrl] = useState('');
 
   // Quote notification state
@@ -665,6 +668,17 @@ export default function HomePage() {
 
   const { weight, cost, materialCost, laborCost, designCost, totalBarLength, numberOfBars, wastageWeight, totalLinearMeters, linearFactor, profileWeight, grillAreaSqMeters, minimumApplied, balconyBreakdown } = calculateResults();
 
+  // Compliance check — runs on every relevant state change.
+  // For balcony/staircase: gap AND height must be within code limits before a
+  // price is shown.  For window/security: gap warning only (not blocking).
+  const heightMm = heightInCm * 10;
+  const complianceCheckIn = grillType === 'balcony' ? parseFloat(balconyCheck) :
+                             (showAdvancedCalculator ? parseFloat(barSpacing) : 0);
+  const compliance = complianceCheckIn > 0
+    ? checkCompliance({ grillType, checkInches: complianceCheckIn, heightMm: heightInCm > 0 ? heightMm : 0 })
+    : { compliant: true, blocking: false, messages: [] };
+  const quoteRange = (!compliance.blocking && cost > 0) ? buildQuoteRange(cost) : null;
+
   // Track calculator usage when values change (debounced so partially-typed
   // dimensions don't flood the analytics with bogus entries)
   useEffect(() => {
@@ -725,6 +739,7 @@ export default function HomePage() {
     setWaModal(false);
     setWaName('');
     setWaPhone('');
+    setWaConsent(false);
     window.open(waPendingUrl, '_blank', 'noopener,noreferrer');
 
     // Fire-and-forget lead capture in the background
@@ -1463,26 +1478,33 @@ export default function HomePage() {
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-2">Check Size (bar gap)</p>
                         <div className="grid grid-cols-3 gap-2">
-                          {[
-                            { value: '3', label: '3″', desc: 'Fine / tight' },
-                            { value: '4', label: '4″', desc: 'Standard' },
-                            { value: '5', label: '5″', desc: 'Open / light' },
-                          ].map(({ value, label, desc }) => (
+                          {getCompliantCheckOptions([
+                            { value: '3', label: '3″', desc: 'Safe / tight' },
+                            { value: '4', label: '4″', desc: 'Not for railings' },
+                            { value: '5', label: '5″', desc: 'Not for railings' },
+                          ], grillType).map(({ value, label, desc, disabled }) => (
                             <button
                               key={value}
                               type="button"
-                              onClick={() => setBalconyCheck(value)}
+                              disabled={disabled}
+                              onClick={() => !disabled && setBalconyCheck(value)}
+                              title={disabled ? 'Exceeds 100 mm child-safety limit for fall-protection railings (NBC 2016)' : undefined}
                               className={`text-center p-3 rounded-xl border transition-all duration-200 ${
-                                balconyCheck === value
-                                  ? 'border-accent-400 bg-accent-400/20 text-accent-300'
-                                  : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:border-white/30'
+                                disabled
+                                  ? 'border-white/8 bg-white/3 text-slate-600 cursor-not-allowed opacity-50'
+                                  : balconyCheck === value
+                                    ? 'border-accent-400 bg-accent-400/20 text-accent-300'
+                                    : 'border-white/15 bg-white/5 text-slate-300 hover:bg-white/10 hover:border-white/30'
                               }`}
                             >
                               <p className="text-sm font-semibold">{label}</p>
-                              <p className="text-xs opacity-70">{desc}</p>
+                              <p className="text-xs opacity-70">{disabled ? '⚠ unsafe gap' : desc}</p>
                             </button>
                           ))}
                         </div>
+                        {grillType === 'balcony' && (
+                          <p className="text-[10px] text-slate-500 mt-1.5">4-inch sphere rule — only gaps &lt; 100 mm (3″) are allowed for balcony railings.</p>
+                        )}
                       </div>
                     </div>
                   )}
@@ -1495,122 +1517,165 @@ export default function HomePage() {
                       transition={{ duration: 0.3 }}
                       className="border-t border-white/10 pt-6"
                     >
-                      <p className="text-sm font-medium text-slate-300">Budget Estimate</p>
-                      <p data-testid="est-cost" className="text-4xl font-extrabold tracking-tight mt-1">
-                        ₹{Math.round(isNaN(cost) ? 0 : cost).toLocaleString('en-IN')}*
-                      </p>
-                      <div className="flex flex-wrap gap-2 mt-3">
-                        {grillAreaSqMeters > 0 && cost > 0 && (
-                          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
-                            ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')}/sq.ft
-                          </span>
-                        )}
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-white/10 text-slate-200">
-                          All-inclusive estimate
-                        </span>
-                      </div>
-                      {minimumApplied && (
-                        <p className="mt-3 text-xs font-medium text-amber-300">
-                          ⚠ Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
-                        </p>
+                      {/* Compliance blocking — show safety reason instead of price */}
+                      {compliance.blocking && (
+                        <div className="rounded-xl bg-red-500/15 border border-red-400/40 p-4 mb-4">
+                          <p className="text-sm font-bold text-red-300 mb-2">⛔ Safety issue — quote unavailable</p>
+                          {compliance.messages.map((msg, i) => (
+                            <p key={i} className="text-xs text-red-200 leading-relaxed mb-1">{msg}</p>
+                          ))}
+                          <p className="text-xs text-red-300/70 mt-2">Correct the configuration above to enable the estimate.</p>
+                        </div>
                       )}
 
-                      <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                        <div className="rounded-xl bg-white/10 p-3" data-testid="est-weight">
-                          <p className="text-lg font-bold leading-none">{Math.round(isNaN(weight) ? 0 : weight)}</p>
-                          <p className="text-[11px] text-slate-300 mt-1">kg · Est. Weight</p>
+                      {/* Non-blocking compliance warnings (window/security or height notice) */}
+                      {!compliance.blocking && compliance.messages.length > 0 && (
+                        <div className="rounded-xl bg-amber-500/15 border border-amber-400/40 p-3 mb-4">
+                          {compliance.messages.map((msg, i) => (
+                            <p key={i} className="text-xs text-amber-200 leading-relaxed">⚠ {msg}</p>
+                          ))}
                         </div>
-                        <div className="rounded-xl bg-white/10 p-3">
-                          <p className="text-lg font-bold leading-none">{(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)}</p>
-                          <p className="text-[11px] text-slate-300 mt-1">m · Material</p>
-                        </div>
-                        <div className="rounded-xl bg-white/10 p-3">
-                          <p className="text-lg font-bold leading-none">{numericQuantity}</p>
-                          <p className="text-[11px] text-slate-300 mt-1">Quantity</p>
-                        </div>
-                      </div>
+                      )}
 
-                      <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
-                        {[
-                          ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
-                          ['Section', grillType === 'balcony' ? 'MS Angle + 10mm Sq Rod' : ({
-                            square: 'Square Pipe',
-                            square_heavy: 'Heavy Square Pipe',
-                            round: 'Round Pipe',
-                            angle: 'Angle Iron',
-                            rod_8mm: '8mm Round Rod',
-                            rod_10mm: '10mm Round Rod',
-                            rod_12mm: '12mm Round Rod',
-                            sq_rod_8mm: '8mm Square Rod',
-                            sq_rod_10mm: '10mm Square Rod',
-                            sq_rod_12mm: '12mm Square Rod'
-                          }[profileType] || 'Standard Profile')],
-                          ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
-                          ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`]
-                        ].map(([label, value]) => (
-                          <div key={label} className="flex items-center justify-between">
-                            <span className="text-slate-400">{label}</span>
-                            <span className="font-medium text-slate-100">{value}</span>
+                      {!compliance.blocking && quoteRange && (
+                        <>
+                          <p className="text-sm font-medium text-slate-300">Indicative Estimate</p>
+                          <p data-testid="est-cost" className="text-3xl font-extrabold tracking-tight mt-1">
+                            ₹{quoteRange.low.toLocaleString('en-IN')} – ₹{quoteRange.high.toLocaleString('en-IN')}
+                          </p>
+                          <div className="flex flex-wrap gap-2 mt-3">
+                            {grillAreaSqMeters > 0 && cost > 0 && (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-400/20 text-emerald-300">
+                                ≈ ₹{Math.round(cost / (grillAreaSqMeters * 10.7639)).toLocaleString('en-IN')}/sq.ft
+                              </span>
+                            )}
+                            {compliance.compliant && ['balcony', 'staircase'].includes(grillType) && (
+                              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-green-400/20 text-green-300">
+                                ✓ Meets NBC 2016 child-safety spacing
+                              </span>
+                            )}
                           </div>
-                        ))}
-                      </div>
+                          {minimumApplied && (
+                            <p className="mt-3 text-xs font-medium text-amber-300">
+                              ⚠ Minimum order charge of ₹{pricing.minimumCharge.toLocaleString('en-IN')} applied
+                            </p>
+                          )}
 
-                      {/* Show working — balcony only */}
-                      {grillType === 'balcony' && balconyBreakdown && (
-                        <div className="mt-4">
-                          <button
-                            type="button"
-                            onClick={() => setShowBalconyWorking(v => !v)}
-                            className="text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
-                          >
-                            <svg className={`w-3 h-3 transition-transform ${showBalconyWorking ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
-                            {showBalconyWorking ? 'Hide' : 'Show'} working
-                          </button>
-                          {showBalconyWorking && (
-                            <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-4 text-xs space-y-1.5">
-                              <p className="font-semibold text-slate-200 mb-2">Calculation breakdown (per unit)</p>
-                              {[
-                                ['Style', balconyBreakdown.breakdown.type === 'box'
-                                  ? `Box — plan ${balconyBreakdown.breakdown.Wg.toFixed(0)}″ × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`
-                                  : 'Plain'],
-                                ['Check / pitch', `${balconyBreakdown.breakdown.checkIn}″ check → ${balconyBreakdown.breakdown.pitchIn}″ pitch`],
-                                ['Frame (angle iron)', `${(balconyBreakdown.breakdown.Lframe_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.frameKg.toFixed(1)} kg`],
-                                ['Vertical bars', `${balconyBreakdown.breakdown.nVert} × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`],
-                                ['Horizontal bars', `${balconyBreakdown.breakdown.nHorz} × ${balconyBreakdown.breakdown.Wg.toFixed(0)}″`],
-                                ['Rod total', `${(balconyBreakdown.breakdown.Lrod_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.rodKg.toFixed(1)} kg`],
-                                ['Per unit (+ 5% wastage)', `${balconyBreakdown.perUnit.weightKg.toFixed(1)} kg`],
-                                ['Total weight', `${numericQuantity} × ${balconyBreakdown.perUnit.weightKg.toFixed(1)} = ${balconyBreakdown.total.weightKg.toFixed(1)} kg`],
-                              ].map(([k, v]) => (
-                                <div key={k} className="flex justify-between gap-2">
-                                  <span className="text-slate-400 shrink-0">{k}</span>
-                                  <span className="text-slate-200 text-right">{v}</span>
+                          {/* GST breakdown */}
+                          <div className="mt-4 rounded-xl bg-white/5 border border-white/10 p-3 text-xs space-y-1">
+                            <div className="flex justify-between text-slate-300">
+                              <span>Base estimate (mid-point)</span>
+                              <span>₹{Math.round(cost).toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                              <span>+ 18% GST (works contract)</span>
+                              <span>₹{quoteRange.gst.toLocaleString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between font-semibold text-slate-100 border-t border-white/10 pt-1 mt-1">
+                              <span>Total incl. GST</span>
+                              <span>₹{quoteRange.totalWithGst.toLocaleString('en-IN')}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+                            <div className="rounded-xl bg-white/10 p-3" data-testid="est-weight">
+                              <p className="text-lg font-bold leading-none">{Math.round(isNaN(weight) ? 0 : weight)}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">kg · Est. Weight</p>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-3">
+                              <p className="text-lg font-bold leading-none">{(isNaN(totalLinearMeters) ? 0 : totalLinearMeters).toFixed(1)}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">m · Material</p>
+                            </div>
+                            <div className="rounded-xl bg-white/10 p-3">
+                              <p className="text-lg font-bold leading-none">{numericQuantity}</p>
+                              <p className="text-[11px] text-slate-300 mt-1">Quantity</p>
+                            </div>
+                          </div>
+
+                          <div className="mt-5 space-y-1.5 text-sm border-t border-white/10 pt-4">
+                            {[
+                              ['Material', metalType === 'steel' ? 'Mild Steel' : 'Stainless Steel 304'],
+                              ['Section', grillType === 'balcony' ? 'MS Angle + 10mm Sq Rod' : ({
+                                square: 'Square Pipe',
+                                square_heavy: 'Heavy Square Pipe',
+                                round: 'Round Pipe',
+                                angle: 'Angle Iron',
+                                rod_8mm: '8mm Round Rod',
+                                rod_10mm: '10mm Round Rod',
+                                rod_12mm: '12mm Round Rod',
+                                sq_rod_8mm: '8mm Square Rod',
+                                sq_rod_10mm: '10mm Square Rod',
+                                sq_rod_12mm: '12mm Square Rod'
+                              }[profileType] || 'Standard Profile')],
+                              ['Size', `${widthInCm.toFixed(0)} × ${heightInCm.toFixed(0)} cm`],
+                              ['Metal rate', `₹${getMetalRate().toFixed(0)}/kg`],
+                              ['Valid until', quoteRange.validUntil],
+                            ].map(([label, value]) => (
+                              <div key={label} className="flex items-center justify-between">
+                                <span className="text-slate-400">{label}</span>
+                                <span className="font-medium text-slate-100">{value}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Show working — balcony only */}
+                          {grillType === 'balcony' && balconyBreakdown && (
+                            <div className="mt-4">
+                              <button
+                                type="button"
+                                onClick={() => setShowBalconyWorking(v => !v)}
+                                className="text-xs text-slate-400 hover:text-slate-200 transition-colors flex items-center gap-1"
+                              >
+                                <svg className={`w-3 h-3 transition-transform ${showBalconyWorking ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                {showBalconyWorking ? 'Hide' : 'Show'} working
+                              </button>
+                              {showBalconyWorking && (
+                                <div className="mt-3 rounded-xl bg-white/5 border border-white/10 p-4 text-xs space-y-1.5">
+                                  <p className="font-semibold text-slate-200 mb-2">Calculation breakdown (per unit)</p>
+                                  {[
+                                    ['Style', balconyBreakdown.breakdown.type === 'box'
+                                      ? `Box — plan ${balconyBreakdown.breakdown.Wg.toFixed(0)}″ × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`
+                                      : 'Plain'],
+                                    ['Check / pitch', `${balconyBreakdown.breakdown.checkIn}″ check → ${balconyBreakdown.breakdown.pitchIn}″ pitch`],
+                                    ['Frame (angle iron)', `${(balconyBreakdown.breakdown.Lframe_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.frameKg.toFixed(1)} kg`],
+                                    ['Vertical bars', `${balconyBreakdown.breakdown.nVert} × ${balconyBreakdown.breakdown.Hg.toFixed(0)}″`],
+                                    ['Horizontal bars', `${balconyBreakdown.breakdown.nHorz} × ${balconyBreakdown.breakdown.Wg.toFixed(0)}″`],
+                                    ['Rod total', `${(balconyBreakdown.breakdown.Lrod_in / 12).toFixed(1)} ft → ${balconyBreakdown.perUnit.rodKg.toFixed(1)} kg`],
+                                    ['Per unit (+ 5% wastage)', `${balconyBreakdown.perUnit.weightKg.toFixed(1)} kg`],
+                                    ['Total weight', `${numericQuantity} × ${balconyBreakdown.perUnit.weightKg.toFixed(1)} = ${balconyBreakdown.total.weightKg.toFixed(1)} kg`],
+                                  ].map(([k, v]) => (
+                                    <div key={k} className="flex justify-between gap-2">
+                                      <span className="text-slate-400 shrink-0">{k}</span>
+                                      <span className="text-slate-200 text-right">{v}</span>
+                                    </div>
+                                  ))}
                                 </div>
-                              ))}
+                              )}
                             </div>
                           )}
-                        </div>
-                      )}
 
-                      <div className="mt-6 space-y-3">
-                        <button
-                          onClick={handleWhatsAppQuoteClick}
-                          className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
-                        >
-                          <WhatsAppIcon className="w-5 h-5" />
-                          Get this quote on WhatsApp
-                        </button>
-                        <button
-                          onClick={() => handleTabSwitch('contact')}
-                          className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
-                        >
-                          Send for Final Quote
-                        </button>
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
-                        *This is a rough estimate (excludes GST). Final pricing may vary based on design complexity, finishing, and installation requirements.
-                      </p>
+                          <div className="mt-6 space-y-3">
+                            <button
+                              onClick={handleWhatsAppQuoteClick}
+                              className="inline-flex items-center justify-center gap-2 w-full rounded-xl bg-[#25D366] px-5 py-3 font-semibold text-white shadow-lg hover:bg-[#1ebe5b] transition-colors"
+                            >
+                              <WhatsAppIcon className="w-5 h-5" />
+                              Get this quote on WhatsApp
+                            </button>
+                            <button
+                              onClick={() => handleTabSwitch('contact')}
+                              className="w-full rounded-xl border border-white/25 px-5 py-3 font-semibold text-white hover:bg-white/10 transition-colors"
+                            >
+                              Send for Final Quote
+                            </button>
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-4 leading-relaxed">
+                            Indicative estimate only — subject to site measurement and final confirmation. Valid until {quoteRange.validUntil}. Final price confirmed after inspection. GST extra at 18%.
+                          </p>
+                        </>
+                      )}
                     </motion.div>
                   ) : (
                     <div className="border-t border-white/10 pt-6">
@@ -2191,13 +2256,26 @@ export default function HomePage() {
                   className="w-full rounded-xl border border-steel-300 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
                 />
               </div>
+              {/* DPDP Act 2023 consent */}
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={waConsent}
+                  onChange={e => setWaConsent(e.target.checked)}
+                  className="mt-0.5 shrink-0 accent-[#25D366]"
+                  required
+                />
+                <span className="text-xs text-steel-500 leading-relaxed">
+                  I agree to be contacted about my enquiry. Your details are used only to respond to this request and are not shared with third parties.
+                </span>
+              </label>
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setWaModal(false)} className="flex-1 rounded-xl border border-steel-300 px-4 py-2.5 text-sm font-semibold text-steel-700 hover:bg-steel-50 transition-colors">
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={waSubmitting || !waName.trim() || !waPhone.trim()}
+                  disabled={waSubmitting || !waName.trim() || !waPhone.trim() || !waConsent}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white hover:bg-[#1ebe5b] disabled:opacity-50 transition-colors"
                 >
                   <WhatsAppIcon className="w-4 h-4" />
