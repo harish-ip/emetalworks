@@ -12,3 +12,14 @@ server-dev.log
 vite-dev.log
 playwright-*.log
 pw-spot*.log
+
+
+.env.*
+*.pem
+*.key
+*.tfstate
+*.tfstate.*
+.terraform/
+*.tfvars
+!*.tfvars.example
+kubeconfig*
