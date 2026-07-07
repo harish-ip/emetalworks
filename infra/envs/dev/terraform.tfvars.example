@@ -1,0 +1,31 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# terraform.tfvars is gitignored — never commit the real file.
+#
+# Run order:
+#   1. Fill in the S3/DynamoDB values in backend.tf  (one-time, can't use vars there)
+#   2. Copy this file:  cp terraform.tfvars.example terraform.tfvars
+#   3. Edit terraform.tfvars with real values
+#   4. make init && make plan
+
+# ── General ───────────────────────────────────────────────────────────────────
+aws_region   = "ap-south-1"   # Mumbai — closest to Hyderabad
+project_name = "emetalworks"
+environment  = "dev"
+
+# ── Networking ────────────────────────────────────────────────────────────────
+vpc_cidr   = "10.0.0.0/16"
+enable_nat = false            # false = no NAT gateway cost; nodes in public subnets
+
+# ── EKS ───────────────────────────────────────────────────────────────────────
+cluster_name           = "emetalworks-dev"
+cluster_version        = "1.30"
+enable_cluster_logging = false   # true adds ~$0.50/GB CloudWatch cost
+
+# ── Node group ────────────────────────────────────────────────────────────────
+node_instance_type = "t3.medium"   # 2 vCPU / 4 GB — cheapest that runs EKS reliably
+node_min_size      = 1
+node_desired_size  = 1
+node_max_size      = 2
+
+# ── ECR ───────────────────────────────────────────────────────────────────────
+image_retention_count = 5
