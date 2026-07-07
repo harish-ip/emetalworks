@@ -10,11 +10,12 @@
 
 ## Day 0 — Guardrails (do before anything else)
 
-- [ ] Set AWS billing alarm at ₹1,000 (CloudWatch billing alert + SNS email)
-- [ ] Set a second alarm at ₹2,500 as a hard warning
-- [ ] Create a dedicated IAM user/role for Terraform (no root usage)
-- [ ] Create S3 bucket + DynamoDB table for Terraform remote state
-- [ ] Add `.env`, `*.pem`, `*.key`, `terraform.tfstate*` to `.gitignore` (secrets hygiene — no repeat of the SpendWise `.env` commit)
+
+- [done ] Set AWS billing alarm at ₹1,000 (CloudWatch billing alert + SNS email)
+- [done ] Set a second alarm at ₹2,500 as a hard warning
+- [done ] Create a dedicated IAM user/role for Terraform (no root usage)
+- [done ] Create S3 bucket + DynamoDB table for Terraform remote state
+- [done ] Add `.env`, `*.pem`, `*.key`, `terraform.tfstate*` to `.gitignore` (secrets hygiene — no repeat of the SpendWise `.env` commit)
 
 ---
 
