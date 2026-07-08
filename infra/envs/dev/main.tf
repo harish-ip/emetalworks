@@ -33,6 +33,7 @@ module "vpc" {
 
   project_name = var.project_name
   environment  = var.environment
+  cluster_name = var.cluster_name
   vpc_cidr     = var.vpc_cidr
   enable_nat   = var.enable_nat
 }
@@ -63,6 +64,7 @@ module "eks" {
 
   project_name           = var.project_name
   environment            = var.environment
+  aws_region             = var.aws_region
   cluster_name           = var.cluster_name
   cluster_version        = var.cluster_version
   vpc_id                 = module.vpc.vpc_id

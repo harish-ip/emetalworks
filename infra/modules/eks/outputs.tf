@@ -28,5 +28,5 @@ output "oidc_provider_url" {
 
 output "kubeconfig_command" {
   description = "aws eks update-kubeconfig command for this cluster."
-  value       = "aws eks update-kubeconfig --name ${var.cluster_name} --region <aws_region>"
+  value       = "aws eks update-kubeconfig --name ${var.cluster_name} --region ${var.aws_region}"
 }
