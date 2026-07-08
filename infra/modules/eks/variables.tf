@@ -67,6 +67,11 @@ variable "node_max_size" {
   default     = 2
 }
 
+variable "aws_region" {
+  description = "AWS region where the cluster is deployed (e.g. ap-south-1)."
+  type        = string
+}
+
 variable "enable_cluster_logging" {
   description = "Enable EKS control-plane log types to CloudWatch (adds cost)."
   type        = bool
