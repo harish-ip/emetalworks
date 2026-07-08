@@ -18,7 +18,7 @@ terraform {
   backend "s3" {
     bucket         = "emetalworks-tfstate-658735297348" # e.g. emetalworks-tf-state-123456789012
     key            = "emetalworks/dev/terraform.tfstate"
-    region         = "ap-south-1"                       # update if your bucket is in a different region
+    region         = "ap-south-1"         # update if your bucket is in a different region
     dynamodb_table = "emetalworks-tflock" # e.g. emetalworks-tf-locks
     encrypt        = true
   }
