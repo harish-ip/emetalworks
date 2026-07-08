@@ -33,6 +33,7 @@ module "vpc" {
 
   project_name = var.project_name
   environment  = var.environment
+  cluster_name = var.cluster_name
   vpc_cidr     = var.vpc_cidr
   enable_nat   = var.enable_nat
 }
