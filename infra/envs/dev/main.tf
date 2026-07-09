@@ -39,12 +39,15 @@ module "vpc" {
 }
 
 # ── IAM ───────────────────────────────────────────────────────────────────────
-# Cluster role, node role, and OIDC provider for IRSA.
+# Cluster role, node group role, and (Day 4+) the OIDC provider for IRSA.
 #
-# Dependency note: the OIDC provider ARN is created by the EKS module (it reads
-# the cluster's issuer URL after the cluster exists).  The iam module creates
-# the cluster/node roles here; IRSA-scoped roles that need the OIDC provider
-# are added in Day 3 after the EKS module is implemented.
+# Day 3: cluster_role_arn and node_role_arn are created here and passed to the
+# eks module below.  oidc_issuer_url is left at its default ("") so the OIDC
+# provider resource is not created yet (count = 0).
+#
+# Day 4: after aws_eks_cluster exists, add:
+#   oidc_issuer_url = module.eks.oidc_provider_url
+# That flips the OIDC provider from count=0 to count=1 on the next apply.
 
 module "iam" {
   source = "../../modules/iam"
@@ -52,6 +55,7 @@ module "iam" {
   project_name = var.project_name
   environment  = var.environment
   cluster_name = var.cluster_name
+  # oidc_issuer_url = module.eks.oidc_provider_url  # uncomment on Day 4
 }
 
 # ── EKS ───────────────────────────────────────────────────────────────────────

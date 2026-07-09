@@ -9,20 +9,31 @@ variable "environment" {
 }
 
 variable "cluster_name" {
-  description = "EKS cluster name — used to scope IAM policies to this cluster."
+  description = "EKS cluster name — used as prefix for IAM role names."
   type        = string
 }
 
-# Populated in Day 3 once the EKS module (and its OIDC provider) exists.
-# Wired as: oidc_provider_arn = module.eks.oidc_provider_arn
-variable "oidc_provider_arn" {
-  description = "ARN of the EKS OIDC provider — required for IRSA role creation."
+# ── Day 4 inputs (leave at defaults until EKS module is implemented) ──────────
+
+variable "oidc_issuer_url" {
+  description = <<-EOT
+    EKS cluster OIDC issuer URL WITHOUT the https:// prefix.
+    Example: oidc.eks.ap-south-1.amazonaws.com/id/EXAMPLED539D4633E53DE1B71EXAMPLE
+    Set from module.eks.oidc_provider_url on Day 4.
+    Leave empty ("") on Day 3 — the aws_iam_openid_connect_provider resource is
+    count-gated and will not be created.
+  EOT
   type        = string
-  default     = "" # leave empty until EKS module is implemented (Day 3)
+  default     = ""
 }
 
-variable "oidc_provider_url" {
-  description = "URL of the EKS OIDC provider (without https://) — used in IAM trust policies."
-  type        = string
-  default     = "" # leave empty until EKS module is implemented (Day 3)
+variable "oidc_thumbprint_list" {
+  description = <<-EOT
+    TLS thumbprint(s) of the OIDC issuer's root CA certificate.
+    AWS EKS automatically manages these in newer regions; for ap-south-1 the
+    current Amazon root CA thumbprint is documented in the EKS user guide.
+    Provide as a list of 40-character hex strings (no colons).
+  EOT
+  type        = list(string)
+  default     = ["9e99a48a9960b14926bb7f3b02e22da2b0ab7280"] # Amazon root CA 1
 }
